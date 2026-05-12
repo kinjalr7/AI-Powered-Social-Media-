@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy[asyncio]
+alembic
+asyncpg
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+httpx
+python-dotenv
+transformers[torch]
+fpdf2
+matplotlib
+pytest
+pytest-asyncio
+pytest-cov
