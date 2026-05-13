@@ -11,3 +11,4 @@ class User(Base):
     is_active = Column(Boolean, default=True)
 
     companies = relationship("Company", back_populates="owner")
+    settings = relationship("UserSettings", back_populates="user", uselist=False)

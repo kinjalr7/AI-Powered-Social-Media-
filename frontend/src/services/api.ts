@@ -46,7 +46,19 @@ export const authService = {
   },
 
   getMe: async () => {
-    return api.get('/api/v1/auth/me');
+    try {
+      return await api.get('/api/v1/auth/me');
+    } catch (error) {
+      if (isDemoMode()) {
+        return { 
+          data: {
+            ...seedData.user,
+            settings: seedData.settings
+          } 
+        };
+      }
+      throw error;
+    }
   }
 };
 
@@ -155,11 +167,12 @@ export const reportsService = {
   getStatus: async () => {
     try {
       const res = await api.get('/api/v1/reports/status');
-      if (isDemoMode() && (!res.data || !res.data.recent_reports || res.data.recent_reports.length === 0)) {
+      if (isDemoMode()) {
+        const realReports = res.data?.recent_reports || [];
         return { data: { 
-          recent_reports: seedData.reports,
+          recent_reports: [...realReports, ...seedData.reports],
           scheduled_reports: seedData.scheduledReports,
-          active_generations: 1
+          active_generations: realReports.filter((r: any) => r.status === 'Processing').length
         }};
       }
       return res;
@@ -325,9 +338,9 @@ export const dashboardService = {
     }
   },
 
-  getRecentPosts: async (timeframe = 'week') => {
+  getRecentPosts: async (timeframe = 'week', page = 1, limit = 5) => {
     try {
-      const res = await api.get(`/api/v1/posts?timeframe=${timeframe}`);
+      const res = await api.get(`/api/v1/posts?timeframe=${timeframe}&page=${page}&limit=${limit}`);
       if (isDemoMode() && (!res.data || res.data.length === 0)) {
         const tf = (timeframe === 'week' || timeframe === 'month' || timeframe === 'year') ? timeframe : 'week';
         return { data: seedData.posts[tf] };
@@ -509,5 +522,149 @@ export const analyticsService = {
     return api.post(`/api/v1/analytics/recalculate?company_id=${companyId}`);
   }
 };
+
+export const chartsService = {
+  getEngagementTrend: async (timeframe = 'week', platform?: string) => {
+    try {
+      const url = platform && platform !== 'all' ? `/api/v1/charts/engagement-trend?timeframe=${timeframe}&platform=${platform}` : `/api/v1/charts/engagement-trend?timeframe=${timeframe}`;
+      return await api.get(url);
+    } catch (error) {
+      if (isDemoMode()) return { data: seedData.engagement[timeframe] || seedData.engagement.week };
+      throw error;
+    }
+  },
+
+  getPlatformDistribution: async (timeframe = 'week', platform?: string) => {
+    try {
+      const url = platform && platform !== 'all' ? `/api/v1/charts/platform-distribution?timeframe=${timeframe}&platform=${platform}` : `/api/v1/charts/platform-distribution?timeframe=${timeframe}`;
+      return await api.get(url);
+    } catch (error) {
+      if (isDemoMode()) return { data: seedData.reach[timeframe] || seedData.reach.week };
+      throw error;
+    }
+  },
+
+  getSentimentBreakdown: async (timeframe = 'week', platform?: string) => {
+    try {
+      const url = platform && platform !== 'all' ? `/api/v1/charts/sentiment-breakdown?timeframe=${timeframe}&platform=${platform}` : `/api/v1/charts/sentiment-breakdown?timeframe=${timeframe}`;
+      return await api.get(url);
+    } catch (error) {
+      if (isDemoMode()) {
+        const sentiment = seedData.sentiment[timeframe] || seedData.sentiment.week;
+        return { data: {
+          overall: sentiment.positive,
+          segments: [
+            { name: "Positive", value: sentiment.positive, color: "#10b981" },
+            { name: "Neutral", value: sentiment.neutral, color: "#64748b" },
+            { name: "Negative", value: sentiment.negative, color: "#ef4444" }
+          ]
+        }};
+      }
+      throw error;
+    }
+  },
+
+  getTopTopics: async (timeframe = 'week', platform?: string) => {
+    try {
+      const url = platform && platform !== 'all' ? `/api/v1/charts/top-topics?timeframe=${timeframe}&platform=${platform}` : `/api/v1/charts/top-topics?timeframe=${timeframe}`;
+      return await api.get(url);
+    } catch (error) {
+      if (isDemoMode()) return { data: seedData.topics[timeframe] || seedData.topics.week };
+      throw error;
+    }
+  },
+
+  getComparisonData: async (type: 'platform' | 'trend' = 'platform', timeframe = 'week', platform?: string) => {
+    try {
+      const url = platform && platform !== 'all' 
+        ? `/api/v1/charts/comparison?type=${type}&timeframe=${timeframe}&platform=${platform}` 
+        : `/api/v1/charts/comparison?type=${type}&timeframe=${timeframe}`;
+      return await api.get(url);
+    } catch (error) {
+      if (isDemoMode()) {
+        if (type === 'platform') {
+          return { data: [
+            { name: "Twitter", engagement: 4500, reach: 15000, posts: 42 },
+            { name: "LinkedIn", engagement: 3800, reach: 12000, posts: 28 },
+            { name: "Instagram", engagement: 5200, reach: 18000, posts: 35 },
+            { name: "Facebook", engagement: 2900, reach: 8000, posts: 15 }
+          ]};
+        } else {
+          return { data: [
+            { name: "Mon", current: 2400, previous: 2100 },
+            { name: "Tue", current: 1398, previous: 1200 },
+            { name: "Wed", current: 9800, previous: 8500 },
+            { name: "Thu", current: 3908, previous: 4200 },
+            { name: "Fri", current: 4800, previous: 4500 }
+          ]};
+        }
+      }
+      throw error;
+    }
+  },
+
+  getFullChartsData: async (timeframe = 'week', platform?: string) => {
+    try {
+      const url = platform && platform !== 'all' 
+        ? `/api/v1/charts/full-data?timeframe=${timeframe}&platform=${platform}` 
+        : `/api/v1/charts/full-data?timeframe=${timeframe}`;
+      return await api.get(url);
+    } catch (error) {
+      if (isDemoMode()) {
+        const tf = (timeframe === 'week' || timeframe === 'month' || timeframe === 'year') ? timeframe : 'week';
+        return { data: {
+          engagement: seedData.engagement[tf],
+          distribution: seedData.reach[tf],
+          sentiment: {
+            overall: 84,
+            segments: [
+              { name: "Positive", value: 65, color: "#10b981" },
+              { name: "Neutral", value: 25, color: "#64748b" },
+              { name: "Negative", value: 10, color: "#ef4444" }
+            ]
+          },
+          topics: seedData.topics[tf],
+          platformComparison: [
+            { name: "Twitter", engagement: 4500, reach: 15000, posts: 42 },
+            { name: "LinkedIn", engagement: 3800, reach: 12000, posts: 28 },
+            { name: "Instagram", engagement: 5200, reach: 18000, posts: 35 },
+            { name: "Facebook", engagement: 2900, reach: 8000, posts: 15 }
+          ],
+          trendComparison: [
+            { name: "Mon", current: 2400, previous: 2100 },
+            { name: "Tue", current: 1398, previous: 1200 }
+          ]
+        }};
+      }
+      throw error;
+    }
+  }
+};
+
+export const settingsService = {
+  getSettings: async () => {
+    try {
+      const res = await api.get('/api/v1/settings/');
+      return res;
+    } catch (error) {
+      if (isDemoMode()) return { data: seedData.settings };
+      throw error;
+    }
+  },
+  updateSettings: async (settings: any) => {
+    try {
+      const res = await api.patch('/api/v1/settings/', settings);
+      return res;
+    } catch (error) {
+      if (isDemoMode()) {
+        // Mock update in demo mode
+        Object.assign(seedData.settings, settings);
+        return { data: seedData.settings };
+      }
+      throw error;
+    }
+  }
+};
+;
 
 export default api;

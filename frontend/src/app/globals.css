@@ -64,6 +64,12 @@
     --input: 217 33% 27%;
     --ring: 239 84% 67%;
   }
+
+  .dark select,
+  .dark option {
+    background-color: #0f172a; /* Force dark background */
+    color: #f8fafc; /* Force light text */
+  }
 }
 
 @layer base {

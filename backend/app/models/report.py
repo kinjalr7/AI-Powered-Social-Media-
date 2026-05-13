@@ -14,4 +14,5 @@ class Report(Base):
     size = Column(String, nullable=True) # e.g. "1.2 MB"
     url = Column(String, nullable=True)
     error_message = Column(String, nullable=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

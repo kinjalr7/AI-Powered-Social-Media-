@@ -89,20 +89,36 @@ export default function DashboardPage() {
     setError(null);
     setDemoMode(isDemoMode());
 
-    // Fetch all parts in parallel
-    // This is much faster than waiting for one massive consolidated response
-    Promise.all([
-      fetchDashboardPart('stats', () => dashboardService.getStats(currentTimeframe)),
-      fetchDashboardPart('engagement', () => dashboardService.getEngagementData(currentTimeframe)),
-      fetchDashboardPart('reach', () => dashboardService.getPlatformReach(currentTimeframe)),
-      fetchDashboardPart('sentiment', () => dashboardService.getSentimentOverview(currentTimeframe)),
-      fetchDashboardPart('topics', () => dashboardService.getTopTopics(currentTimeframe)),
-      fetchDashboardPart('posts', () => dashboardService.getRecentPosts(currentTimeframe))
-    ]).catch(err => {
-        if (err?.response?.status === 401) {
-            router.push('/login');
-        }
-    });
+    try {
+      const res = await dashboardService.getDashboardSummary(currentTimeframe);
+      const dataBlob = res.data;
+      
+      setData({
+        stats: dataBlob.stats,
+        engagement: dataBlob.engagement,
+        reach: dataBlob.reach,
+        sentiment: dataBlob.sentiment,
+        topics: dataBlob.topics,
+        posts: dataBlob.posts
+      });
+    } catch (err: any) {
+      console.error("Dashboard Load Error:", err);
+      if (err?.response?.status === 401) {
+        router.push('/login');
+      } else {
+        setError("Intelligence systems offline. Attempting protocol recovery...");
+        toast.error("Failed to sync intelligence data");
+      }
+    } finally {
+      setLoadingStates({
+        stats: false,
+        engagement: false,
+        reach: false,
+        sentiment: false,
+        topics: false,
+        posts: false
+      });
+    }
   }, [timeframe, router]);
 
   const handleWebSocketMessage = useCallback((message: any) => {

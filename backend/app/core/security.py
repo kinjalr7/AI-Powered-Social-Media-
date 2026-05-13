@@ -58,7 +58,12 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     
-    result = await db.execute(select(User).where(User.email == token_data.email))
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(User)
+        .where(User.email == token_data.email)
+        .options(selectinload(User.settings))
+    )
     user = result.scalars().first()
     
     if user is None:

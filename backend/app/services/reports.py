@@ -97,3 +97,136 @@ async def generate_pdf(db: AsyncSession, company_id: int) -> str:
     pdf.output(report_path)
     
     return report_path
+
+async def generate_global_audit(db: AsyncSession, user_id: int) -> str:
+    """
+    Generate a global intelligence audit for a user across all their companies/data.
+    Returns the path to the generated PDF.
+    """
+    # 1. Fetch aggregate data (Mocked or calculated for the demo/audit)
+    # In a real app, you'd aggregate scores across all tracked companies
+    summary_metrics = {
+        "Total Engagement": "1.2M",
+        "Average Sentiment": "78%",
+        "Active Companies": 8,
+        "Insights Generated": 142
+    }
+    
+    platforms = ['LinkedIn', 'Twitter/X', 'Instagram', 'Reddit']
+    platform_shares = [35, 25, 20, 20]
+    
+    # 2. Generate Charts
+    # Chart 1: Platform Distribution
+    plt.figure(figsize=(8, 5))
+    plt.pie(platform_shares, labels=platforms, autopct='%1.1f%%', colors=['#4F46E5', '#06B6D4', '#EC4899', '#F59E0B'])
+    plt.title("Cross-Platform Distribution", fontsize=14)
+    
+    img_buf_1 = io.BytesIO()
+    plt.savefig(img_buf_1, format='png', bbox_inches='tight')
+    img_buf_1.seek(0)
+    plt.close()
+
+    # Chart 2: Engagement Trend
+    plt.figure(figsize=(8, 4))
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May']
+    trend = [65, 72, 68, 85, 92]
+    plt.plot(months, trend, marker='o', linewidth=3, color='#4F46E5')
+    plt.fill_between(months, trend, alpha=0.1, color='#4F46E5')
+    plt.title("Intelligence Growth Trend", fontsize=14)
+    plt.grid(axis='y', linestyle='--', alpha=0.3)
+    
+    img_buf_2 = io.BytesIO()
+    plt.savefig(img_buf_2, format='png', bbox_inches='tight')
+    img_buf_2.seek(0)
+    plt.close()
+
+    # 3. Create PDF
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Header
+    pdf.set_font("helvetica", "B", 24)
+    pdf.set_text_color(79, 70, 229) # Primary indigo
+    pdf.cell(0, 20, "Global Intelligence Audit", ln=True, align="C")
+    
+    pdf.set_font("helvetica", "I", 10)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 5, f"Report Generated: {uuid.uuid4().hex[:8].upper()} | {os.name}", ln=True, align="C")
+    pdf.ln(10)
+    
+    # Summary Table
+    pdf.set_fill_color(248, 250, 252)
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 12, "Executive Summary Metrics", ln=True, fill=True)
+    pdf.ln(2)
+    
+    pdf.set_font("helvetica", "", 11)
+    for label, value in summary_metrics.items():
+        pdf.set_font("helvetica", "B", 11)
+        pdf.cell(50, 8, f"{label}:", ln=0)
+        pdf.set_font("helvetica", "", 11)
+        pdf.cell(0, 8, str(value), ln=True)
+    
+    pdf.ln(10)
+    
+    # Platform Insights
+    pdf.set_font("helvetica", "B", 14)
+    pdf.cell(0, 10, "Platform Distribution Insights", ln=True)
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
+        tmp_img.write(img_buf_1.getvalue())
+        tmp_img_path = tmp_img.name
+    try:
+        pdf.image(tmp_img_path, x=15, y=None, w=130)
+    finally:
+        if os.path.exists(tmp_img_path): os.unlink(tmp_img_path)
+    
+    pdf.ln(5)
+    pdf.set_font("helvetica", "I", 10)
+    pdf.multi_cell(0, 5, "Data indicates a strong concentration in LinkedIn professional networks, with increasing momentum on Reddit for niche community engagement.")
+    
+    pdf.add_page()
+    # Trends
+    pdf.set_font("helvetica", "B", 14)
+    pdf.cell(0, 10, "Strategic Engagement Trends", ln=True)
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
+        tmp_img.write(img_buf_2.getvalue())
+        tmp_img_path = tmp_img.name
+    try:
+        pdf.image(tmp_img_path, x=15, y=None, w=170)
+    finally:
+        if os.path.exists(tmp_img_path): os.unlink(tmp_img_path)
+    
+    pdf.ln(10)
+    
+    # Action Items
+    pdf.set_fill_color(238, 242, 255)
+    pdf.set_font("helvetica", "B", 14)
+    pdf.cell(0, 12, "Strategic Action Items", ln=True, fill=True)
+    pdf.ln(4)
+    
+    pdf.set_font("helvetica", "", 11)
+    actions = [
+        "1. Capitalize on high engagement Thursdays for LinkedIn content deployment.",
+        "2. Address emerging negative sentiment in Twitter mentions regarding product latency.",
+        "3. Redirect 15% of marketing spend to Instagram Reels based on viral reach potential.",
+        "4. Standardize cross-platform branding to unify professional and social presence."
+    ]
+    for action in actions:
+        pdf.multi_cell(0, 8, action)
+        pdf.ln(1)
+
+    pdf.ln(20)
+    pdf.set_font("helvetica", "I", 8)
+    pdf.set_text_color(148, 163, 184)
+    pdf.cell(0, 10, "CONFIDENTIAL - AI Social Intelligence Platform Internal Audit", align="C")
+
+    # Save PDF
+    report_filename = f"global_audit_{user_id}_{uuid.uuid4().hex[:8]}.pdf"
+    temp_dir = tempfile.gettempdir()
+    report_path = os.path.join(temp_dir, report_filename)
+    pdf.output(report_path)
+    
+    return report_path

@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, case
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import functools
 import time
+import asyncio
 
 from app.db.session import get_db
 from app.models.post import Post
@@ -16,10 +17,7 @@ from app.models.user import User
 
 router = APIRouter()
 
-import asyncio
-
 # Simple in-memory cache for dashboard metrics
-# In a real production app, use Redis
 _cache = {}
 CACHE_TTL = 300 # 5 minutes
 
@@ -47,7 +45,6 @@ async def get_dashboard_stats(
     if cached_data:
         return cached_data
 
-    # Calculate start date
     now = datetime.now()
     if timeframe == "week":
         start_date = now - timedelta(days=7)
@@ -56,41 +53,26 @@ async def get_dashboard_stats(
     else: # year
         start_date = now - timedelta(days=365)
 
-    # Execute queries in parallel for better performance
-    engagement_task = db.execute(
-        select(func.sum(Post.likes))
+    # Optimized single query for all stats
+    query = (
+        select(
+            func.sum(Post.likes).label("total_engagement"),
+            func.count(Post.id).label("total_posts"),
+            func.sum(case((Post.sentiment == 'Positive', 1), else_=0)).label("positive_count")
+        )
         .join(SocialAccount)
         .join(Company)
         .where(Company.user_id == current_user.id)
         .where(Post.created_at >= start_date)
     )
     
-    posts_task = db.execute(
-        select(func.count(Post.id))
-        .join(SocialAccount)
-        .join(Company)
-        .where(Company.user_id == current_user.id)
-        .where(Post.created_at >= start_date)
-    )
+    result = await db.execute(query)
+    row = result.one()
     
-    positive_task = db.execute(
-        select(func.count(Post.id))
-        .join(SocialAccount)
-        .join(Company)
-        .where(Company.user_id == current_user.id)
-        .where(Post.sentiment == 'Positive')
-        .where(Post.created_at >= start_date)
-    )
-
-    engagement_result, posts_result, positive_result = await asyncio.gather(
-        engagement_task, posts_task, positive_task
-    )
-
-    total_engagement = engagement_result.scalar() or 0
-    total_posts = posts_result.scalar() or 0
-    positive_count = positive_result.scalar() or 0
+    total_engagement = row.total_engagement or 0
+    total_posts = row.total_posts or 0
+    positive_count = row.positive_count or 0
     
-    # Average Reach (engagement * 15 fallback)
     avg_reach = total_engagement * 15
     sentiment_score = (positive_count / total_posts * 100) if total_posts > 0 else 0
 
@@ -110,7 +92,6 @@ async def get_engagement_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Mocking daily data for simplicity, but in real it would group by date
     days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     if timeframe == 'month':
         days = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
@@ -201,7 +182,6 @@ async def get_top_topics(
     timeframe: str = "week",
     current_user: User = Depends(get_current_user)
 ):
-    # This would normally involve NLP on post content
     return [
         { "topic": '#AIInnovation', "count": '12.4K', "growth": '+15%' },
         { "topic": 'TechTrends2024', "count": '8.2K', "growth": '+8%' },
@@ -255,9 +235,6 @@ async def get_recent_posts(
 async def get_live_alerts(
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Get live alert notifications.
-    """
     return [
         {"id": 1, "type": "engagement_spike", "message": "High engagement on your latest Twitter post!", "time": "5m ago"},
         {"id": 2, "type": "mention", "message": "@TechCorp mentioned you in a post.", "time": "12m ago"}
@@ -269,22 +246,20 @@ async def get_full_dashboard_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Consolidated endpoint to fetch all dashboard data in one request for performance."""
-    # Execute all sub-functions in parallel
-    results = await asyncio.gather(
-        get_dashboard_stats(timeframe, db, current_user),
-        get_engagement_data(timeframe, db, current_user),
-        get_platform_reach(timeframe, db, current_user),
-        get_sentiment_overview(timeframe, db, current_user),
-        get_top_topics(timeframe, current_user),
-        get_recent_posts(timeframe, 1, 5, db, current_user)
-    )
+    """Consolidated endpoint fetched sequentially to ensure session safety and reliable delivery."""
+    # Running sequentially is much safer with SQLAlchemy AsyncSession
+    stats = await get_dashboard_stats(timeframe, db, current_user)
+    engagement = await get_engagement_data(timeframe, db, current_user)
+    reach = await get_platform_reach(timeframe, db, current_user)
+    sentiment = await get_sentiment_overview(timeframe, db, current_user)
+    topics = await get_top_topics(timeframe, current_user)
+    posts = await get_recent_posts(timeframe, 1, 5, db, current_user)
     
     return {
-        "stats": results[0],
-        "engagement": results[1],
-        "reach": results[2],
-        "sentiment": results[3],
-        "topics": results[4],
-        "posts": results[5]
+        "stats": stats,
+        "engagement": engagement,
+        "reach": reach,
+        "sentiment": sentiment,
+        "topics": topics,
+        "posts": posts
     }

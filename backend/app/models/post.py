@@ -7,10 +7,10 @@ class Post(Base):
     __tablename__ = "posts"
 
     id = Column(Integer, primary_key=True, index=True)
-    social_id = Column(Integer, ForeignKey("social_accounts.id"), nullable=False)
+    social_id = Column(Integer, ForeignKey("social_accounts.id"), nullable=False, index=True)
     content = Column(Text, nullable=False)
     likes = Column(Integer, default=0)
-    sentiment = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    sentiment = Column(String, nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     social_account = relationship("SocialAccount", back_populates="posts")

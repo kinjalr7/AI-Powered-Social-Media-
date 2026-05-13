@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.core.security import get_current_user
@@ -240,22 +241,18 @@ async def get_full_social_data(
     current_user: User = Depends(get_current_user)
 ):
     """Consolidated endpoint to fetch all social intelligence data in one request."""
-    import asyncio
-    
-    results = await asyncio.gather(
-        get_connected_accounts(db, current_user),
-        get_recent_posts(db, current_user),
-        get_sync_history(db, current_user),
-        get_engagement_summary(db, current_user),
-        get_platform_summary(db, current_user),
-        company_service.get_companies(db, user_id=current_user.id)
-    )
+    accounts = await get_connected_accounts(db, current_user)
+    posts = await get_recent_posts(db, current_user)
+    history = await get_sync_history(db, current_user)
+    summary = await get_engagement_summary(db, current_user)
+    performance = await get_platform_summary(db, current_user)
+    companies = await company_service.get_companies(db, user_id=current_user.id)
     
     return {
-        "accounts": results[0],
-        "posts": results[1],
-        "sync_history": results[2],
-        "summary": results[3],
-        "performance": results[4],
-        "companies": results[5]
+        "accounts": accounts,
+        "posts": posts,
+        "sync_history": history,
+        "summary": summary,
+        "performance": performance,
+        "companies": companies
     }

@@ -112,7 +112,7 @@ export default function SocialDataPage() {
   const [syncingIds, setSyncingIds] = useState<Set<number>>(new Set());
 
   const getPlatformIcon = (platform: string) => {
-    const p = platform.toLowerCase();
+    const p = (platform || '').toLowerCase();
     if (p.includes('instagram')) return <Instagram className="w-5 h-5" />;
     if (p.includes('twitter') || p.includes('x')) return <Twitter className="w-5 h-5" />;
     if (p.includes('linkedin')) return <Linkedin className="w-5 h-5" />;
@@ -121,7 +121,7 @@ export default function SocialDataPage() {
   };
 
   const getPlatformColor = (platform: string) => {
-    const p = platform.toLowerCase();
+    const p = (platform || '').toLowerCase();
     if (p.includes('instagram')) return "text-pink-500 bg-pink-500/10 border-pink-500/20";
     if (p.includes('twitter') || p.includes('x')) return "text-blue-400 bg-blue-400/10 border-blue-400/20";
     if (p.includes('linkedin')) return "text-blue-600 bg-blue-600/10 border-blue-600/20";
@@ -212,16 +212,20 @@ export default function SocialDataPage() {
 
   const filteredPosts = useMemo(() => {
     return posts.filter(post => {
-      const matchesPlatform = platformFilter === "all" || post.platform.toLowerCase() === platformFilter.toLowerCase();
-      const matchesSearch = post.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const platform = post.platform || "";
+      const content = post.content || "";
+      const matchesPlatform = platformFilter === "all" || platform.toLowerCase() === platformFilter.toLowerCase();
+      const matchesSearch = content.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesPlatform && matchesSearch;
     });
   }, [posts, platformFilter, searchQuery]);
 
   const filteredHistory = useMemo(() => {
     return syncHistory.filter(log => {
-      const matchesPlatform = platformFilter === "all" || log.platform.toLowerCase() === platformFilter.toLowerCase();
-      const matchesStatus = statusFilter === "all" || log.status.toLowerCase() === statusFilter.toLowerCase();
+      const platform = log.platform || "";
+      const status = log.status || "";
+      const matchesPlatform = platformFilter === "all" || platform.toLowerCase() === platformFilter.toLowerCase();
+      const matchesStatus = statusFilter === "all" || status.toLowerCase() === statusFilter.toLowerCase();
       return matchesPlatform && matchesStatus;
     });
   }, [syncHistory, platformFilter, statusFilter]);
@@ -388,7 +392,7 @@ export default function SocialDataPage() {
                       <div className="flex items-center gap-2">
                         <div className={cn(
                           "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
-                          p.status.toLowerCase() === 'active' || p.status.toLowerCase() === 'connected'
+                          (p.status || '').toLowerCase() === 'active' || (p.status || '').toLowerCase() === 'connected'
                             ? "bg-teal-500/10 text-teal-400 border-teal-500/20"
                             : "bg-amber-500/10 text-amber-500 border-amber-500/20"
                         )}>
@@ -547,8 +551,8 @@ export default function SocialDataPage() {
                             <TableCell>
                               <Badge variant="outline" className={cn(
                                 "text-[9px] font-black uppercase tracking-widest px-2 py-0.5",
-                                post.sentiment.toLowerCase() === 'positive' ? "bg-teal-500/10 text-teal-400 border-teal-500/20" :
-                                post.sentiment.toLowerCase() === 'negative' ? "bg-rose-500/10 text-rose-400 border-rose-500/20" :
+                                (post.sentiment || '').toLowerCase() === 'positive' ? "bg-teal-500/10 text-teal-400 border-teal-500/20" :
+                                (post.sentiment || '').toLowerCase() === 'negative' ? "bg-rose-500/10 text-rose-400 border-rose-500/20" :
                                 "bg-slate-500/10 text-slate-400 border-slate-500/20"
                               )}>
                                 {post.sentiment}
@@ -568,7 +572,7 @@ export default function SocialDataPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <span className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">
-                                {post.created_at.includes('T') ? new Date(post.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : post.created_at}
+                                {post.created_at?.includes('T') ? new Date(post.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : (post.created_at || '--:--')}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -626,10 +630,10 @@ export default function SocialDataPage() {
                       </div>
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
                         <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
-                          {log.status.toUpperCase()}
+                          {(log.status || '').toUpperCase()}
                         </span>
                         <span className="text-[10px] font-medium text-slate-500">
-                          {new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}
                         </span>
                       </div>
                     </div>

@@ -69,7 +69,7 @@ export default function EngagementChart({ data }: EngagementChartProps) {
             strokeWidth={4}
             fillOpacity={1} 
             fill="url(#colorEngage)"
-            animationDuration={2500}
+            animationDuration={800}
             style={{ filter: 'drop-shadow(0 0 12px rgba(139, 92, 246, 0.5))' }}
             activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }}
           />
@@ -82,7 +82,7 @@ export default function EngagementChart({ data }: EngagementChartProps) {
             strokeDasharray="8 5"
             fillOpacity={1} 
             fill="url(#colorReach)"
-            animationDuration={3000}
+            animationDuration={1000}
             style={{ filter: 'drop-shadow(0 0 8px rgba(6, 182, 212, 0.3))' }}
             activeDot={{ r: 5, fill: '#06b6d4', stroke: '#fff', strokeWidth: 2 }}
           />

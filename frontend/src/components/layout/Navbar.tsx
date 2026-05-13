@@ -14,11 +14,7 @@ import {
   User,
   Bell,
   Search,
-  Sun,
-  Moon,
-  Monitor
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,13 +33,11 @@ const navItems = [
   { name: "Reports", href: "/reports", icon: FileText },
   { name: "Charts", href: "/charts", icon: PieChart },
   { name: "Social Data", href: "/social-data", icon: Share2 },
-  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -103,44 +97,6 @@ export default function Navbar() {
             <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
           </button>
 
-          {/* Theme Switcher */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
-                {mounted && (
-                  <>
-                    {theme === 'dark' ? <Moon className="w-5 h-5" /> : 
-                     theme === 'light' ? <Sun className="w-5 h-5" /> : 
-                     <Monitor className="w-5 h-5" />}
-                  </>
-                )}
-                {!mounted && <div className="w-5 h-5" />}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover border-border text-popover-foreground p-1 min-w-[120px]">
-              <DropdownMenuItem 
-                onClick={() => setTheme("light")}
-                className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md px-2 py-1.5 text-sm"
-              >
-                <Sun className="w-4 h-4" />
-                <span>Light</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setTheme("dark")}
-                className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md px-2 py-1.5 text-sm"
-              >
-                <Moon className="w-4 h-4" />
-                <span>Dark</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setTheme("system")}
-                className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md px-2 py-1.5 text-sm"
-              >
-                <Monitor className="w-4 h-4" />
-                <span>System</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           <div className="h-6 w-[1px] bg-border mx-1 hidden sm:block"></div>
 
@@ -153,32 +109,51 @@ export default function Navbar() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:block text-left">
-                  <p className="text-xs font-bold text-foreground leading-none">{session?.user?.name || 'Kinjal Patel'}</p>
-                  <p className="text-[10px] text-muted-foreground leading-none mt-1">Admin Account</p>
+                  <p className="text-xs font-bold text-foreground leading-none truncate max-w-[100px]">
+                    {session?.user?.name || (session?.user as any)?.email?.split('@')[0] || 'User Account'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground leading-none mt-1">Verified Identity</p>
                 </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-popover border-border text-popover-foreground p-2">
-              <div className="px-2 py-1.5">
-                <p className="text-xs text-muted-foreground">Signed in as</p>
-                <p className="text-sm font-bold truncate text-foreground">{session?.user?.email || 'kinjal@example.com'}</p>
+            <DropdownMenuContent align="end" className="w-64 bg-popover border-border text-popover-foreground p-2 shadow-2xl">
+              <div className="px-3 py-3 border-b border-border/50 mb-2">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Authenticated Account</p>
+                <p className="text-sm font-bold truncate text-foreground">
+                  {(session?.user as any)?.name || (session?.user as any)?.email?.split('@')[0] || 'User Account'}
+                </p>
+                <p className="text-xs text-muted-foreground truncate font-medium">
+                  {session?.user?.email || 'authenticated@user.io'}
+                </p>
               </div>
-              <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem className="hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-lg px-2 py-2 text-sm font-medium">
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+              
+              <DropdownMenuItem asChild>
+                <Link href="/profile" className="flex items-center gap-3 hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-lg px-3 py-2.5 text-sm font-bold transition-colors">
+                  <User className="h-4 w-4 text-primary" />
+                  <span>View Profile</span>
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-lg px-2 py-2 text-sm font-medium">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+              
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="flex items-center gap-3 hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-lg px-3 py-2.5 text-sm font-bold transition-colors">
+                  <Settings className="h-4 w-4 text-indigo-400" />
+                  <span>Account Settings</span>
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
+
+              <DropdownMenuSeparator className="bg-border/50 my-1" />
+              
               <DropdownMenuItem 
-                className="hover:bg-destructive/10 cursor-pointer text-destructive focus:text-destructive rounded-lg px-2 py-2 text-sm font-medium"
-                onClick={() => signOut({ callbackUrl: '/login' })}
+                className="flex items-center gap-3 hover:bg-destructive/10 cursor-pointer text-destructive focus:text-destructive rounded-lg px-3 py-2.5 text-sm font-bold transition-colors"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('token');
+                  }
+                  signOut({ callbackUrl: '/login' });
+                }}
               >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Logout</span>
+                <LogOut className="h-4 w-4" />
+                <span>Terminate Session</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

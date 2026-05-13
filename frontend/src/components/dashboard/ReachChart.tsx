@@ -50,7 +50,7 @@ export default function ReachChart({ data }: ReachChartProps) {
             dataKey="value"
             stroke="none"
             animationBegin={0}
-            animationDuration={2000}
+            animationDuration={800}
             cornerRadius={8}
           >
             {chartData.map((entry, index) => (
@@ -103,7 +103,7 @@ export default function ReachChart({ data }: ReachChartProps) {
         <motion.div
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1, delay: 0.5 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
         >
           <p className="text-4xl font-black text-white tracking-tighter leading-none mb-1 shadow-primary/20 drop-shadow-2xl">
             {formatValue(totalValue)}

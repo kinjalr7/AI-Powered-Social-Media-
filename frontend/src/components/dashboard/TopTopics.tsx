@@ -32,8 +32,12 @@ export default function TopTopics({ data, timeframe }: TopTopicsProps) {
             </div>
           </div>
           <div className="text-right">
-            <p className={`text-xs font-black tracking-tight ${item.growth.startsWith('+') ? 'text-emerald-500' : 'text-orange-500'}`}>
-              {item.growth}
+            <p className={`text-xs font-black tracking-tight ${
+              (typeof item.growth === 'string' && item.growth.startsWith('+')) || 
+              (typeof item.growth === 'number' && item.growth >= 0) 
+                ? 'text-emerald-500' : 'text-rose-500'
+            }`}>
+              {typeof item.growth === 'number' ? (item.growth >= 0 ? `+${item.growth}%` : `${item.growth}%`) : item.growth}
             </p>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">vs last {timeframe}</p>
           </div>

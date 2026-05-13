@@ -5,7 +5,7 @@ import DashboardCard from "@/components/dashboard/DashboardCard";
 import { 
   BarChart3, Users, Globe, Activity, RefreshCw, 
   Download, AlertCircle, Filter, Calendar, ChevronDown,
-  LayoutDashboard, PieChart, TrendingUp, Briefcase
+  LayoutDashboard, PieChart, TrendingUp, Briefcase, Target
 } from "lucide-react";
 import dynamic from 'next/dynamic';
 import { analyticsService } from "@/services/api";
@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Dynamic imports for Analytics Components
 const AnalyticsSummary = dynamic(() => import("@/components/analytics/AnalyticsSummary"), { 
+  ssr: false,
   loading: () => <Skeleton className="h-32 w-full bg-slate-800/50 rounded-2xl" /> 
 });
 const EngagementTrendChart = dynamic(() => import("@/components/analytics/EngagementTrendChart"), { 
@@ -69,19 +70,31 @@ export default function AnalyticsPage() {
       const res = await analyticsService.getFullReport(timeframe, platform === 'all' ? undefined : platform);
       const data = res.data;
 
-      setSummaryData(data.summary);
-      setEngagementTrends(data.engagement);
-      setSentimentBreakdown(data.sentiment);
-      setPlatformData(data.platforms);
-      setTopContent(data.content);
-      setHiringTrends(data.hiring);
-      setAudienceGrowth(data.growth);
+      if (!data && !isDemoMode()) {
+        throw new Error("No intelligence data received");
+      }
+
+      setSummaryData(data?.summary || []);
+      setEngagementTrends(data?.engagement || []);
+      setSentimentBreakdown(data?.sentiment || null);
+      setPlatformData(data?.platforms || []);
+      setTopContent(data?.content || []);
+      setHiringTrends(data?.hiring || []);
+      setAudienceGrowth(data?.growth || []);
       
-      setIsDemo(localStorage.getItem('demo_mode') === 'true');
+      setIsDemo(isDemoMode() || localStorage.getItem('demo_mode') === 'true');
       setError(null);
     } catch (err: any) {
       console.error("Analytics Error:", err);
-      setError("Unable to sync with intelligence engine. Please check your connection.");
+      if (isDemoMode()) {
+        // Double down on demo mode if error occurs
+        setIsDemo(true);
+        const tf = timeframe;
+        // The service already handles demo fallback, so if we reach here, 
+        // it's a critical failure. But we'll try to keep the UI alive.
+      } else {
+        setError("Unable to sync with intelligence engine. Please check your connection.");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -172,20 +185,21 @@ export default function AnalyticsPage() {
             <button 
               onClick={() => fetchAnalytics(true)}
               disabled={refreshing}
+              suppressHydrationWarning
               className="bg-slate-800/50 hover:bg-slate-800 text-white p-2.5 rounded-xl border border-white/5 transition-all disabled:opacity-50"
             >
               <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
             </button>
 
             <div className="relative group">
-              <button className="purple-gradient-btn text-xs flex items-center gap-2 group">
+              <button suppressHydrationWarning className="purple-gradient-btn text-xs flex items-center gap-2 group">
                 <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
                 Export Data
                 <ChevronDown className="w-3 h-3 ml-1" />
               </button>
               <div className="absolute right-0 mt-2 w-40 bg-slate-900 border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
-                <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors">Export PDF Report</button>
-                <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors border-t border-white/5">Export CSV Sheet</button>
+                <button suppressHydrationWarning onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors">Export PDF Report</button>
+                <button suppressHydrationWarning onClick={() => handleExport('csv')} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors border-t border-white/5">Export CSV Sheet</button>
               </div>
             </div>
           </div>
@@ -220,6 +234,7 @@ export default function AnalyticsPage() {
                   className="overflow-hidden"
                   headerAction={
                     <select 
+                      suppressHydrationWarning
                       className="bg-transparent text-xs font-bold text-slate-400 outline-none cursor-pointer"
                       value={platform}
                       onChange={(e) => setPlatform(e.target.value)}
@@ -237,73 +252,149 @@ export default function AnalyticsPage() {
                   </div>
                 </DashboardCard>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Platform Performance */}
-                  <DashboardCard title="Platform Comparison" subtitle="Market share and growth rates">
-                    <div className="h-[350px] mt-4">
-                      {loading ? <Skeleton className="h-full w-full bg-slate-800/50 rounded-xl" /> : <PlatformPerformance data={platformData} />}
-                    </div>
-                  </DashboardCard>
-
-                  {/* Hiring Trends */}
-                  <DashboardCard title="Hiring Intelligence" subtitle="Talent signals and recruiting activity">
-                    <div className="h-[350px] mt-4">
-                      {loading ? <Skeleton className="h-full w-full bg-slate-800/50 rounded-xl" /> : <HiringInsights data={hiringTrends} />}
-                    </div>
-                  </DashboardCard>
-                </div>
-              </div>
-
-              {/* Sidebar Area - Right 4 Columns */}
-              <div className="xl:col-span-4 space-y-8">
-                
-                {/* Sentiment Breakdown */}
-                <DashboardCard title="Sentiment Architecture" subtitle="Aggregate brand emotional state">
-                  <div className="h-[350px] mt-4">
-                    {loading ? <Skeleton className="h-full w-full bg-slate-800/50 rounded-xl" /> : <SentimentBreakdownChart data={sentimentBreakdown} />}
-                  </div>
-                </DashboardCard>
-
-                {/* Top Performing Content */}
-                <DashboardCard 
-                  title="Elite Content" 
-                  subtitle="Highest resonance social posts"
-                  headerAction={<button className="text-[10px] font-bold text-primary hover:underline">View All</button>}
-                >
-                  <div className="mt-4">
-                    {loading ? (
-                      <div className="space-y-4">
-                        {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full bg-slate-800/50 rounded-xl" />)}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Platform Performance */}
+                    <DashboardCard title="Platform Comparison" subtitle="Market share and growth rates">
+                      <div className="h-[350px] mt-4">
+                        {loading ? <Skeleton className="h-full w-full bg-slate-800/50 rounded-xl" /> : <PlatformPerformance data={platformData} />}
                       </div>
-                    ) : <TopContentList data={topContent} />}
-                  </div>
-                </DashboardCard>
+                    </DashboardCard>
 
-                {/* Audience Growth */}
-                <DashboardCard title="Network Expansion" subtitle="Follower growth trajectory">
-                  <div className="h-[200px] mt-4">
-                    {loading ? <Skeleton className="h-full w-full bg-slate-800/50 rounded-xl" /> : <AudienceGrowthChart data={audienceGrowth} />}
+                    {/* Hiring Trends */}
+                    <DashboardCard title="Hiring Intelligence" subtitle="Talent signals and recruiting activity">
+                      <div className="h-[350px] mt-4">
+                        {loading ? <Skeleton className="h-full w-full bg-slate-800/50 rounded-xl" /> : <HiringInsights data={hiringTrends} />}
+                      </div>
+                    </DashboardCard>
                   </div>
-                </DashboardCard>
 
-                {/* Action Panel */}
-                <div className="premium-card p-6 border-primary/20 bg-primary/[0.02] relative overflow-hidden">
-                  <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl" />
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-2">
-                    <Activity className="w-4 h-4 text-primary" />
-                    Intelligence Engine
-                  </h4>
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                    Last audit performed 4 minutes ago. Systems operational.
-                  </p>
-                  <button 
-                    onClick={handleRecalculate}
-                    className="mt-6 w-full py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all flex items-center justify-center gap-2"
-                  >
-                    <RefreshCw className={cn("w-3 h-3", refreshing && "animate-spin")} />
-                    Recalculate Insights
-                  </button>
+                  {/* New Strategic Recommendations Section */}
+                  <div className="premium-card p-8 border-primary/10 bg-slate-900/40 relative overflow-hidden">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
+                      <div>
+                        <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-3">
+                          <Target className="w-6 h-6 text-primary" />
+                          Strategic Recommendations
+                        </h3>
+                        <p className="text-slate-500 text-sm font-medium mt-1">AI-generated growth protocols based on current trend dynamics</p>
+                      </div>
+                      <button className="px-5 py-2 bg-primary/10 border border-primary/20 text-primary text-xs font-black uppercase tracking-widest rounded-xl hover:bg-primary/20 transition-all">
+                        Execute All
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                      {[
+                        { title: "Engagement Boost", desc: "Increase posting frequency on LinkedIn between 9 AM - 11 AM.", impact: "High" },
+                        { title: "Sentiment Recovery", desc: "Address trending 'latency' concerns in Twitter replies.", impact: "Medium" },
+                        { title: "Content Pivot", desc: "Video content is outperforming static images by 4.2x on IG.", impact: "High" }
+                      ].map((rec, i) => (
+                        <div key={i} className="p-5 bg-white/5 border border-white/5 rounded-2xl hover:border-primary/20 transition-all group">
+                          <div className="flex justify-between items-start mb-3">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-primary">{rec.title}</span>
+                            <span className={cn(
+                              "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
+                              rec.impact === "High" ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-400"
+                            )}>{rec.impact} Impact</span>
+                          </div>
+                          <p className="text-xs text-slate-400 leading-relaxed font-medium group-hover:text-slate-200 transition-colors">{rec.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Sidebar Area - Right 4 Columns */}
+                <div className="xl:col-span-4 space-y-8">
+                  
+                  {/* Sentiment Breakdown */}
+                  <DashboardCard title="Sentiment Architecture" subtitle="Aggregate brand emotional state">
+                    <div className="h-[350px] mt-4">
+                      {loading ? <Skeleton className="h-full w-full bg-slate-800/50 rounded-xl" /> : <SentimentBreakdownChart data={sentimentBreakdown} />}
+                    </div>
+                  </DashboardCard>
+
+                  {/* Top Performing Content */}
+                  <DashboardCard 
+                    title="Elite Content" 
+                    subtitle="Highest resonance social posts"
+                    headerAction={<button className="text-[10px] font-bold text-primary hover:underline">View All</button>}
+                  >
+                    <div className="mt-4">
+                      {loading ? (
+                        <div className="space-y-4">
+                          {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full bg-slate-800/50 rounded-xl" />)}
+                        </div>
+                      ) : <TopContentList data={topContent} />}
+                    </div>
+                  </DashboardCard>
+
+                  {/* Audience Growth */}
+                  <DashboardCard title="Network Expansion" subtitle="Follower growth trajectory">
+                    <div className="h-[200px] mt-4">
+                      {loading ? <Skeleton className="h-full w-full bg-slate-800/50 rounded-xl" /> : <AudienceGrowthChart data={audienceGrowth} />}
+                    </div>
+                  </DashboardCard>
+
+                  {/* Action Panel */}
+                  <div className="premium-card p-6 border-primary/20 bg-primary/[0.01] relative overflow-hidden group">
+                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-colors duration-500" />
+                    
+                    <div className="flex justify-between items-start mb-6">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-primary" />
+                        Intelligence Engine
+                      </h4>
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Live</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 mb-8">
+                      {[
+                        { label: "Neural Processors", value: "Optimal", color: "text-primary" },
+                        { label: "Data Pipeline", value: "Active", color: "text-emerald-500" },
+                        { label: "Sync Latency", value: "24ms", color: "text-white" }
+                      ].map((item, i) => (
+                        <div key={i} className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{item.label}</span>
+                          <span className={cn("text-[10px] font-black uppercase tracking-widest", item.color)}>{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Node Status Visualization */}
+                    <div className="space-y-2 mb-8">
+                      <div className="flex justify-between items-center text-[8px] font-black text-slate-600 uppercase tracking-[0.2em]">
+                        <span>Primary Node Status</span>
+                        <span>82% Optimized</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex gap-0.5">
+                        {[40, 25, 15, 10, 10].map((w, i) => (
+                          <div key={i} style={{ width: `${w}%` }} className={cn(
+                            "h-full rounded-full transition-all duration-1000",
+                            i === 0 ? "bg-primary" : 
+                            i === 1 ? "bg-primary/60" : 
+                            i === 2 ? "bg-primary/40" : 
+                            "bg-white/10"
+                          )} />
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed mb-6 italic">
+                      "Intelligence engine is currently scanning 1.2M data points across 4 primary social nodes."
+                    </p>
+
+                    <button 
+                      onClick={handleRecalculate}
+                      className="w-full py-3 bg-slate-800 hover:bg-primary hover:text-white text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all flex items-center justify-center gap-2 group/btn"
+                    >
+                      <RefreshCw className={cn("w-3 h-3 group-hover/btn:rotate-180 transition-transform duration-500", refreshing && "animate-spin")} />
+                      Recalculate Insights
+                    </button>
+                  </div>
               </div>
             </div>
           </div>

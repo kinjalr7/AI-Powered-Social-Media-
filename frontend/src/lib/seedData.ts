@@ -26,7 +26,7 @@ export const seedData = {
       engagement_rate: "4.2%",
       last_sync: "2026-05-12T18:30:00Z",
       icon: "Twitter",
-      color: "#1DA1F2"
+      color: "#8b5cf6"
     },
     {
       id: "plt_li",
@@ -38,7 +38,7 @@ export const seedData = {
       engagement_rate: "6.8%",
       last_sync: "2026-05-12T18:15:00Z",
       icon: "Linkedin",
-      color: "#0077B5"
+      color: "#06b6d4"
     },
     {
       id: "plt_ig",
@@ -50,7 +50,7 @@ export const seedData = {
       engagement_rate: "5.4%",
       last_sync: "2026-05-10T12:00:00Z",
       icon: "Instagram",
-      color: "#E4405F"
+      color: "#ec4899"
     }
   ],
   stats: {
@@ -103,42 +103,42 @@ export const seedData = {
   },
   reach: {
     week: [
-      { name: 'Twitter', value: 45000, color: '#1DA1F2' },
-      { name: 'LinkedIn', value: 21000, color: '#0077B5' },
-      { name: 'Facebook', value: 12000, color: '#1877F2' },
-      { name: 'Instagram', value: 34000, color: '#E4405F' },
+      { name: 'Twitter', value: 45000, color: '#8b5cf6' },
+      { name: 'LinkedIn', value: 21000, color: '#06b6d4' },
+      { name: 'Facebook', value: 12000, color: '#3b82f6' },
+      { name: 'Instagram', value: 34000, color: '#ec4899' },
     ],
     month: [
-      { name: 'Twitter', value: 180000, color: '#1DA1F2' },
-      { name: 'LinkedIn', value: 95000, color: '#0077B5' },
-      { name: 'Facebook', value: 52000, color: '#1877F2' },
-      { name: 'Instagram', value: 145000, color: '#E4405F' },
+      { name: 'Twitter', value: 180000, color: '#8b5cf6' },
+      { name: 'LinkedIn', value: 95000, color: '#06b6d4' },
+      { name: 'Facebook', value: 52000, color: '#3b82f6' },
+      { name: 'Instagram', value: 145000, color: '#ec4899' },
     ],
     year: [
-      { name: 'Twitter', value: 2100000, color: '#1DA1F2' },
-      { name: 'LinkedIn', value: 1200000, color: '#0077B5' },
-      { name: 'Facebook', value: 650000, color: '#1877F2' },
-      { name: 'Instagram', value: 1800000, color: '#E4405F' },
+      { name: 'Twitter', value: 2100000, color: '#8b5cf6' },
+      { name: 'LinkedIn', value: 1200000, color: '#06b6d4' },
+      { name: 'Facebook', value: 650000, color: '#3b82f6' },
+      { name: 'Instagram', value: 1800000, color: '#ec4899' },
     ]
   },
   topics: {
     week: [
-      { topic: 'Quantum Computing', count: '12.4K', growth: '+15%' },
-      { topic: 'Remote Engineering', count: '8.2K', growth: '+8%' },
-      { topic: 'Edge Security', count: '5.1K', growth: '+2%' },
-      { topic: 'Digital Sovereignty', count: '3.9K', growth: '-1%' },
+      { topic: 'Quantum Computing', count: 12400, growth: 15 },
+      { topic: 'Remote Engineering', count: 8200, growth: 8 },
+      { topic: 'Edge Security', count: 5100, growth: 2 },
+      { topic: 'Digital Sovereignty', count: 3900, growth: -1 },
     ],
     month: [
-      { topic: 'Quantum Computing', count: '45.2K', growth: '+25%' },
-      { topic: 'Cloud Migration', count: '32.1K', growth: '+18%' },
-      { topic: 'Cyber Resilience', count: '28.5K', growth: '+12%' },
-      { topic: 'AI Ethics', count: '19.9K', growth: '+5%' },
+      { topic: 'Quantum Computing', count: 45200, growth: 25 },
+      { topic: 'Cloud Migration', count: 32100, growth: 18 },
+      { topic: 'Cyber Resilience', count: 28500, growth: 12 },
+      { topic: 'AI Ethics', count: 19900, growth: 5 },
     ],
     year: [
-      { topic: 'AI Revolution', count: '540K', growth: '+120%' },
-      { topic: 'Hybrid Work', count: '420K', growth: '+85%' },
-      { topic: 'Cybersecurity', count: '380K', growth: '+45%' },
-      { topic: 'Edge Computing', count: '310K', growth: '+30%' },
+      { topic: 'AI Revolution', count: 540000, growth: 120 },
+      { topic: 'Hybrid Work', count: 420000, growth: 85 },
+      { topic: 'Cybersecurity', count: 380000, growth: 45 },
+      { topic: 'Edge Computing', count: 310000, growth: 30 },
     ]
   },
   posts: {
@@ -159,7 +159,7 @@ export const seedData = {
     { id: 'rep_7710', name: 'Global Digital Strategy Report Q1 2026', status: 'Completed', date: '2026-04-30', type: 'Global', format: 'PDF', size: '2.4 MB', url: '#' },
     { id: 'rep_7711', name: 'Competitor Benchmarking Analysis', status: 'Completed', date: '2026-05-05', type: 'Competitor', format: 'PDF', size: '1.8 MB', url: '#' },
     { id: 'rep_7712', name: 'Annual Sentiment Audit Data', status: 'Failed', date: '2026-03-15', type: 'Global', format: 'PDF', size: '0.5 MB', url: '#', error_message: 'External API source unreachable' },
-    { id: 'rep_7713', name: 'Monthly Performance Snapshot', status: 'Processing', date: '2026-05-13', type: 'Global', format: 'PDF', size: '--', url: '#' },
+    { id: 'rep_7713', name: 'Monthly Performance Snapshot', status: 'Completed', date: '2026-05-13', type: 'Global', format: 'PDF', size: '1.2 MB', url: '#' },
   ],
   scheduledReports: [
     { id: 'sch_1', name: 'Weekly Performance Snapshot', next_run: '2026-05-15', frequency: 'Weekly' },
@@ -191,6 +191,21 @@ export const seedData = {
     sentiment_trend: 4.1,
     total_posts: 256,
     posts_trend: 5.4
+  },
+  settings: {
+    full_name: "Sarah Chen",
+    company: "Nexus Dynamics",
+    role: "Head of Digital Strategy",
+    theme: "dark",
+    timezone: "UTC-8",
+    locale: "en-US",
+    notifications_enabled: true,
+    email_reports_enabled: true,
+    connected_accounts_prefs: {
+      twitter: true,
+      linkedin: true,
+      instagram: false
+    }
   }
 };
 

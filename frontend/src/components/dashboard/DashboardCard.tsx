@@ -8,14 +8,21 @@ interface DashboardCardProps {
   children: ReactNode;
   className?: string;
   delay?: number;
+  headerAction?: ReactNode;
 }
 
-export default function DashboardCard({ title, subtitle, children, className, delay = 0 }: DashboardCardProps) {
+export default function DashboardCard({ 
+  title, 
+  subtitle, 
+  children, 
+  className, 
+  delay = 0,
+  headerAction
+}: DashboardCardProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
       className={cn("premium-card flex flex-col bg-slate-900/40", className)}
     >
@@ -24,7 +31,10 @@ export default function DashboardCard({ title, subtitle, children, className, de
           <h3 className="text-white font-black text-sm uppercase tracking-[0.2em] group-hover/card:text-primary transition-colors">{title}</h3>
           {subtitle && <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{subtitle}</p>}
         </div>
-        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-glow" />
+        <div className="flex items-center gap-4">
+          {headerAction && <div className="animate-in fade-in slide-in-from-right-4 duration-500">{headerAction}</div>}
+          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-glow" />
+        </div>
       </div>
       <div className="flex-1 p-6">
         {children}

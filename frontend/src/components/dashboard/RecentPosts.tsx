@@ -12,6 +12,20 @@ interface RecentPostsProps {
 export default function RecentPosts({ data }: RecentPostsProps) {
   const router = useRouter();
 
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-[200px] flex flex-col items-center justify-center text-center space-y-4 p-6">
+        <div className="w-12 h-12 bg-muted/20 rounded-2xl flex items-center justify-center border border-border">
+          <MessageSquare className="w-6 h-6 text-muted-foreground" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-black text-foreground uppercase tracking-widest">No Intelligence Feed</p>
+          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-[0.1em]">Connect protocols to begin data transmission</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {data.map((post, index) => (

@@ -9,25 +9,55 @@ import uuid
 import random
 import asyncio
 
-from app.db.session import get_db
+from app.db.session import SessionLocal, get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.models.company import Company
 from app.models.report import Report
-from app.services.reports import generate_pdf
+from app.services.reports import generate_pdf, generate_global_audit
 from app.core.config import settings
 
 router = APIRouter()
 
-async def background_generate_report(report_id: int, user_id: int, db_session_factory):
+async def background_generate_report(report_id: int, user_id: int):
     """Actual generation logic running in background."""
-    # In a real app, we would re-open a session or use a scoped session
-    # For this simplified architecture, we simulate the work
-    await asyncio.sleep(3) # Simulate heavy PDF generation
-    
-    # Normally we would update the DB here
-    # Since we are using async SQLAlchemy, we need to be careful with sessions in background
-    pass
+    try:
+        # We need a new session for background tasks
+        async with SessionLocal() as db:
+            # 1. Fetch report
+            result = await db.execute(select(Report).where(Report.id == report_id))
+            report = result.scalars().first()
+            if not report:
+                return
+
+            # 2. Update status to Processing (redundant but safe)
+            report.status = "Processing"
+            await db.commit()
+
+            # 3. Generate the actual PDF
+            if report.type == "Global":
+                report_path = await generate_global_audit(db, user_id)
+            elif report.type == "Company" and report.company_id:
+                report_path = await generate_pdf(db, report.company_id)
+            else:
+                report_path = await generate_global_audit(db, user_id)
+            
+            filename = os.path.basename(report_path)
+            
+            # 4. Finalize report record
+            report.status = "Completed"
+            report.size = f"{os.path.getsize(report_path) / 1024 / 1024:.1f} MB"
+            report.url = f"{settings.API_V1_STR}/reports/download/{filename}"
+            report.error_message = None
+            await db.commit()
+    except Exception as e:
+        async with SessionLocal() as db:
+            result = await db.execute(select(Report).where(Report.id == report_id))
+            report = result.scalars().first()
+            if report:
+                report.status = "Failed"
+                report.error_message = str(e)
+                await db.commit()
 
 @router.post("/")
 async def generate_global_report(
@@ -52,10 +82,11 @@ async def generate_global_report(
     await db.refresh(new_report)
     
     # Add to background tasks
-    # background_tasks.add_task(background_generate_report, new_report.id, current_user.id, get_db)
+    background_tasks.add_task(background_generate_report, new_report.id, current_user.id)
     
     return {
         "id": new_report.id,
+        "task_id": new_report.id,
         "message": "Report generation initiated in background",
         "status": new_report.status,
         "report_name": new_report.name
@@ -118,6 +149,7 @@ async def get_report_details(
 @router.post("/{report_id}/retry")
 async def retry_report(
     report_id: int,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -128,11 +160,14 @@ async def retry_report(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     
-    report.status = "Completed" # Simulated retry success
+    report.status = "Processing"
     report.error_message = None
     await db.commit()
     
-    return {"message": "Report retried successfully", "status": report.status}
+    # Re-trigger background task
+    background_tasks.add_task(background_generate_report, report.id, current_user.id)
+    
+    return {"message": "Report retry initiated", "status": report.status, "task_id": report.id}
 
 @router.delete("/{report_id}")
 async def delete_report(
@@ -152,13 +187,16 @@ async def delete_report(
     
     return {"message": "Report deleted successfully"}
 
-@router.get("/companies/{company_id}/report")
-async def get_company_report(
+@router.post("/companies/{company_id}/report")
+async def initiate_company_report(
     company_id: int,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # (Existing logic, but simplified/improved)
+    """
+    Initiate a background report generation for a specific company.
+    """
     result = await db.execute(
         select(Company).where(Company.id == company_id, Company.user_id == current_user.id)
     )
@@ -166,29 +204,29 @@ async def get_company_report(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     
-    try:
-        report_path = await generate_pdf(db, company_id)
-        filename = os.path.basename(report_path)
-        
-        # Save to DB record as well
-        new_report = Report(
-            user_id=current_user.id,
-            name=f"Company Audit: {company.name}",
-            status="Completed",
-            type="Company",
-            size=f"{os.path.getsize(report_path) / 1024 / 1024:.2f} MB",
-            url=f"{settings.API_V1_STR}/reports/download/{filename}"
-        )
-        db.add(new_report)
-        await db.commit()
-
-        return {
-            "company_name": company.name,
-            "report_url": new_report.url,
-            "message": "Report generated successfully"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    new_report = Report(
+        user_id=current_user.id,
+        company_id=company.id,
+        name=f"Company Audit: {company.name}",
+        status="Processing",
+        type="Company",
+        format="PDF",
+        size="Processing..."
+    )
+    
+    db.add(new_report)
+    await db.commit()
+    await db.refresh(new_report)
+    
+    background_tasks.add_task(background_generate_report, new_report.id, current_user.id)
+    
+    return {
+        "id": new_report.id,
+        "task_id": new_report.id,
+        "message": "Company report generation initiated",
+        "status": new_report.status,
+        "company_name": company.name
+    }
 
 @router.get("/download/{filename}")
 async def download_report_file(filename: str):
