@@ -3,6 +3,7 @@
 import { MessageSquare, Heart, Share2, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface RecentPostsProps {
   data: any[];
@@ -66,6 +67,3 @@ export default function RecentPosts({ data }: RecentPostsProps) {
     </div>
   );
 }
-
-import { cn } from "@/lib/utils";
-

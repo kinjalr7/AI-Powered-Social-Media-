@@ -4,87 +4,65 @@
 
 @layer base {
   :root {
-    --background: #f8fafc;
-    --foreground: #0f172a;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
 
-    --card: #ffffff;
-    --card-foreground: #0f172a;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-    --popover: #ffffff;
-    --popover-foreground: #0f172a;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: #4f46e5;
-    --primary-foreground: #ffffff;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: #10b981;
-    --secondary-foreground: #ffffff;
+    --secondary: 161 70% 39%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: #4f46e5;
-    --accent-foreground: #ffffff;
+    --accent: 243 75% 59%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: #e2e8f0;
-    --input: #e2e8f0;
-    --ring: #4f46e5;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 243 75% 59%;
 
     --radius: 0.75rem;
-
-    /* Reference Colors Light */
-    --bg-primary: #f8fafc;
-    --bg-card: #ffffff;
-    --border-subtle: #e2e8f0;
-    --accent-indigo: #4f46e5;
-    --accent-teal: #10b981;
-    --accent-rose: #f43f5e;
-    --accent-blue: #3b82f6;
-    --text-primary: #0f172a;
-    --text-muted: #64748b;
   }
 
   .dark {
-    --background: #0f172a;
-    --foreground: #f1f5f9;
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
 
-    --card: #1e293b;
-    --card-foreground: #f1f5f9;
+    --card: 217 33% 17%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: #0f172a;
-    --popover-foreground: #f1f5f9;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: #6366f1;
-    --primary-foreground: #ffffff;
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: #10b981;
-    --secondary-foreground: #0f172a;
+    --secondary: 161 70% 39%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: #334155;
-    --muted-foreground: #94a3b8;
+    --muted: 217 33% 27%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: #6366f1;
-    --accent-foreground: #ffffff;
+    --accent: 239 84% 67%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: #334155;
-    --input: #334155;
-    --ring: #6366f1;
-
-    /* Reference Colors Dark */
-    --bg-primary: #0f172a;
-    --bg-card: #1e293b;
-    --border-subtle: #334155;
-    --accent-indigo: #6366f1;
-    --accent-teal: #10b981;
-    --accent-rose: #f43f5e;
-    --accent-blue: #3b82f6;
-    --text-primary: #f1f5f9;
-    --text-muted: #94a3b8;
+    --border: 217 33% 27%;
+    --input: 217 33% 27%;
+    --ring: 239 84% 67%;
   }
 }
 
@@ -101,24 +79,38 @@
 
 @layer components {
   .glass-card {
-    @apply bg-card border border-border rounded-xl shadow-lg transition-all;
+    @apply bg-card/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transition-all;
   }
   
   .premium-card {
-    @apply bg-card border border-border rounded-xl shadow-sm transition-all;
+    @apply bg-card/30 backdrop-blur-2xl border border-white/5 rounded-3xl shadow-2xl transition-all hover:border-primary/40 hover:shadow-primary/10 hover:bg-card/40 relative overflow-hidden;
+  }
+  
+  .premium-card::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none;
+  }
+
+  .glass-input {
+    @apply bg-muted/20 backdrop-blur-md border border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all rounded-xl outline-none px-4 py-2 text-white;
   }
 
   .purple-gradient-btn {
-    @apply bg-primary hover:opacity-90 transition-all text-primary-foreground font-semibold py-2 px-6 rounded-lg shadow-md active:scale-95;
-  }
-
-  .purple-gradient-text {
-    @apply text-primary;
+    @apply bg-gradient-to-r from-[#8b5cf6] to-[#d946ef] hover:opacity-90 transition-all text-white font-black uppercase tracking-widest text-xs py-3 px-8 rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.3)] active:scale-95;
   }
 
   .card-hover {
-    @apply transition-all duration-200 hover:border-indigo-500/50 hover:shadow-md;
+    @apply transition-all duration-500 hover:scale-[1.01] hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)];
   }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+.animate-glow {
+  animation: glow-pulse 3s infinite ease-in-out;
 }
 
 /* Recharts Customization */
@@ -134,7 +126,3 @@
 .recharts-tooltip-wrapper .recharts-default-tooltip {
   @apply !bg-card !border-border !rounded-lg !shadow-xl !text-foreground !p-2 !text-xs transition-colors;
 }
-
-
-
-

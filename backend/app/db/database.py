@@ -11,7 +11,7 @@ else:
     db_url = f"postgresql+asyncpg://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
 
 engine_kwargs = {
-    "echo": True,
+    "echo": False,
     "future": True
 }
 

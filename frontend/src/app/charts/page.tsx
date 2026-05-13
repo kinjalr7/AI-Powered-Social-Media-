@@ -1,11 +1,26 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import dynamic from 'next/dynamic';
 import DashboardCard from "@/components/dashboard/DashboardCard";
-import EngagementChart from "@/components/dashboard/EngagementChart";
-import ReachChart from "@/components/dashboard/ReachChart";
-import GrowthChart from "@/components/dashboard/GrowthChart";
-import SentimentOverview from "@/components/dashboard/SentimentOverview";
+
+// Dynamic imports for charts
+const EngagementChart = dynamic(() => import("@/components/dashboard/EngagementChart"), { 
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full animate-pulse bg-white/5 rounded-xl" />
+});
+const ReachChart = dynamic(() => import("@/components/dashboard/ReachChart"), { 
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full animate-pulse bg-white/5 rounded-xl" />
+});
+const GrowthChart = dynamic(() => import("@/components/dashboard/GrowthChart"), { 
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full animate-pulse bg-white/5 rounded-xl" />
+});
+const SentimentOverview = dynamic(() => import("@/components/dashboard/SentimentOverview"), { 
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full animate-pulse bg-white/5 rounded-xl" />
+});
 import { dashboardService } from "@/services/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, BarChart, PieChart, TrendingUp, RefreshCw } from "lucide-react";

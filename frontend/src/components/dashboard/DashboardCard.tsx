@@ -17,13 +17,16 @@ export default function DashboardCard({ title, subtitle, children, className, de
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5, delay }}
-      className={cn("premium-card flex flex-col", className)}
+      className={cn("premium-card flex flex-col bg-slate-900/40", className)}
     >
-      <div className="p-5 border-b border-border flex flex-col gap-1">
-        <h3 className="text-foreground font-bold text-base tracking-tight">{title}</h3>
-        {subtitle && <p className="text-muted-foreground text-xs font-medium">{subtitle}</p>}
+      <div className="p-6 border-b border-white/5 flex items-center justify-between group/card">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-white font-black text-sm uppercase tracking-[0.2em] group-hover/card:text-primary transition-colors">{title}</h3>
+          {subtitle && <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{subtitle}</p>}
+        </div>
+        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-glow" />
       </div>
-      <div className="flex-1 p-5">
+      <div className="flex-1 p-6">
         {children}
       </div>
     </motion.div>

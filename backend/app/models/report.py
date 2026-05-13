@@ -8,7 +8,10 @@ class Report(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
-    status = Column(String, default="Completed")
-    type = Column(String, default="Global")
+    status = Column(String, default="Completed") # Pending, Completed, Failed, Processing
+    type = Column(String, default="Global") # Global, Company, Competitor
+    format = Column(String, default="PDF") # PDF, CSV
+    size = Column(String, nullable=True) # e.g. "1.2 MB"
     url = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

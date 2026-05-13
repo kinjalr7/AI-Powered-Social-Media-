@@ -4,8 +4,19 @@ import { Sparkles, ArrowUpRight } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { motion } from "framer-motion";
 
-export default function AnalysisBanner() {
+interface AnalysisBannerProps {
+  insights?: string;
+  loading?: boolean;
+}
+
+export default function AnalysisBanner({ insights, loading }: AnalysisBannerProps) {
   const router = useRouter();
+
+  const defaultInsight = (
+    <>
+      Your engagement is up by <span className="text-emerald-500 font-bold">15%</span> this week. We found <span className="text-primary font-bold">3 new viral trends</span> in your niche that could boost your reach by 25%.
+    </>
+  );
 
   return (
     <motion.div 
@@ -22,9 +33,15 @@ export default function AnalysisBanner() {
         </div>
         <div>
           <h2 className="text-foreground font-black text-xl tracking-tight mb-1">AI Intelligence Insight</h2>
-          <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-xl">
-            Your engagement is up by <span className="text-emerald-500 font-bold">15%</span> this week. We found <span className="text-primary font-bold">3 new viral trends</span> in your niche that could boost your reach by 25%.
-          </p>
+          <div className="text-muted-foreground text-sm font-medium leading-relaxed max-w-xl">
+            {loading ? (
+              <div className="flex gap-2 items-center">
+                <div className="h-4 w-48 bg-white/5 animate-pulse rounded" />
+              </div>
+            ) : (
+              insights || defaultInsight
+            )}
+          </div>
         </div>
       </div>
 

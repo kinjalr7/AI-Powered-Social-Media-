@@ -49,3 +49,15 @@ async def connect_social_account(
     await db.commit()
     await db.refresh(db_account)
     return db_account
+
+async def delete_social_account(db: AsyncSession, account_id: int) -> bool:
+    """
+    Remove a social media account from the database.
+    """
+    result = await db.execute(select(SocialAccount).where(SocialAccount.id == account_id))
+    db_account = result.scalars().first()
+    if db_account:
+        await db.delete(db_account)
+        await db.commit()
+        return True
+    return False

@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+import functools
+import time
 
 from app.db.session import get_db
 from app.models.post import Post
@@ -14,12 +16,37 @@ from app.models.user import User
 
 router = APIRouter()
 
+import asyncio
+
+# Simple in-memory cache for dashboard metrics
+# In a real production app, use Redis
+_cache = {}
+CACHE_TTL = 300 # 5 minutes
+
+def get_cache_key(user_id: int, timeframe: str, endpoint: str):
+    return f"{endpoint}:{user_id}:{timeframe}"
+
+def check_cache(key: str):
+    if key in _cache:
+        data, expiry = _cache[key]
+        if time.time() < expiry:
+            return data
+    return None
+
+def set_cache(key: str, data: any):
+    _cache[key] = (data, time.time() + CACHE_TTL)
+
 @router.get("/stats")
 async def get_dashboard_stats(
     timeframe: str = "week",
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    cache_key = get_cache_key(current_user.id, timeframe, "stats")
+    cached_data = check_cache(cache_key)
+    if cached_data:
+        return cached_data
+
     # Calculate start date
     now = datetime.now()
     if timeframe == "week":
@@ -29,31 +56,24 @@ async def get_dashboard_stats(
     else: # year
         start_date = now - timedelta(days=365)
 
-    # Total Engagement
-    engagement_query = await db.execute(
+    # Execute queries in parallel for better performance
+    engagement_task = db.execute(
         select(func.sum(Post.likes))
         .join(SocialAccount)
         .join(Company)
         .where(Company.user_id == current_user.id)
         .where(Post.created_at >= start_date)
     )
-    total_engagement = engagement_query.scalar() or 0
     
-    # Total Posts
-    posts_query = await db.execute(
+    posts_task = db.execute(
         select(func.count(Post.id))
         .join(SocialAccount)
         .join(Company)
         .where(Company.user_id == current_user.id)
         .where(Post.created_at >= start_date)
     )
-    total_posts = posts_query.scalar() or 0
     
-    # Average Reach (engagement * 15 fallback)
-    avg_reach = total_engagement * 15
-    
-    # Sentiment Score
-    positive_query = await db.execute(
+    positive_task = db.execute(
         select(func.count(Post.id))
         .join(SocialAccount)
         .join(Company)
@@ -61,15 +81,28 @@ async def get_dashboard_stats(
         .where(Post.sentiment == 'Positive')
         .where(Post.created_at >= start_date)
     )
-    positive_count = positive_query.scalar() or 0
+
+    engagement_result, posts_result, positive_result = await asyncio.gather(
+        engagement_task, posts_task, positive_task
+    )
+
+    total_engagement = engagement_result.scalar() or 0
+    total_posts = posts_result.scalar() or 0
+    positive_count = positive_result.scalar() or 0
+    
+    # Average Reach (engagement * 15 fallback)
+    avg_reach = total_engagement * 15
     sentiment_score = (positive_count / total_posts * 100) if total_posts > 0 else 0
 
-    return [
+    data = [
         { "title": 'Total Engagement', "value": f"{total_engagement:,}", "trend": 12.5, "description": f'vs last {timeframe}', "icon": 'Zap' },
         { "title": 'Average Reach', "value": f"{avg_reach:,}", "trend": 8.2, "description": f'vs last {timeframe}', "icon": 'Users' },
         { "title": 'Sentiment Score', "value": f"{sentiment_score:.1f}%", "trend": 4.1, "description": 'Positive growth', "icon": 'Smile' },
         { "title": 'Total Posts', "value": str(total_posts), "trend": 5.4, "description": f'vs last {timeframe}', "icon": 'Target' },
     ]
+    
+    set_cache(cache_key, data)
+    return data
 
 @router.get("/engagement")
 async def get_engagement_data(
@@ -179,6 +212,8 @@ async def get_top_topics(
 @router.get("/posts")
 async def get_recent_posts(
     timeframe: str = "week",
+    page: int = Query(1, ge=1),
+    limit: int = Query(5, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -190,6 +225,8 @@ async def get_recent_posts(
     else: # year
         start_date = now - timedelta(days=365)
 
+    offset = (page - 1) * limit
+
     result = await db.execute(
         select(Post, SocialAccount.platform)
         .join(SocialAccount)
@@ -197,7 +234,8 @@ async def get_recent_posts(
         .where(Company.user_id == current_user.id)
         .where(Post.created_at >= start_date)
         .order_by(Post.created_at.desc())
-        .limit(5)
+        .offset(offset)
+        .limit(limit)
     )
     rows = result.all()
     
@@ -224,3 +262,29 @@ async def get_live_alerts(
         {"id": 1, "type": "engagement_spike", "message": "High engagement on your latest Twitter post!", "time": "5m ago"},
         {"id": 2, "type": "mention", "message": "@TechCorp mentioned you in a post.", "time": "12m ago"}
     ]
+
+@router.get("/dashboard-summary")
+async def get_full_dashboard_summary(
+    timeframe: str = "week",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Consolidated endpoint to fetch all dashboard data in one request for performance."""
+    # Execute all sub-functions in parallel
+    results = await asyncio.gather(
+        get_dashboard_stats(timeframe, db, current_user),
+        get_engagement_data(timeframe, db, current_user),
+        get_platform_reach(timeframe, db, current_user),
+        get_sentiment_overview(timeframe, db, current_user),
+        get_top_topics(timeframe, current_user),
+        get_recent_posts(timeframe, 1, 5, db, current_user)
+    )
+    
+    return {
+        "stats": results[0],
+        "engagement": results[1],
+        "reach": results[2],
+        "sentiment": results[3],
+        "topics": results[4],
+        "posts": results[5]
+    }
