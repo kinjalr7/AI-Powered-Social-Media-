@@ -163,44 +163,93 @@ export const companyService = {
   }
 };
 
+// Local cache for demo mode persistence during session
+// Local cache for demo mode persistence during session
+// Initialized from localStorage to persist across refreshes
+const getStorageItem = (key: string, defaultValue: any) => {
+  if (typeof window === 'undefined') return defaultValue;
+  const saved = localStorage.getItem(key);
+  return saved ? JSON.parse(saved) : defaultValue;
+};
+
+const saveStorageItem = (key: string, value: any) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+};
+
+let demoReports: any[] = getStorageItem('aigravity_demo_reports', []);
+let demoSchedules: any[] = getStorageItem('aigravity_demo_schedules', []);
+
 export const reportsService = {
-  getStatus: async () => {
+  getHistory: async () => {
     try {
-      const res = await api.get('/api/v1/reports/status');
-      if (isDemoMode()) {
-        const realReports = res.data?.recent_reports || [];
-        return { data: { 
-          recent_reports: [...realReports, ...seedData.reports],
-          scheduled_reports: seedData.scheduledReports,
-          active_generations: realReports.filter((r: any) => r.status === 'Processing').length
-        }};
-      }
+      const res = await api.get('/api/v1/reports/history');
       return res;
     } catch (error) {
-      if (isDemoMode()) return { data: { 
-        recent_reports: seedData.reports,
-        scheduled_reports: seedData.scheduledReports,
-        active_generations: 1
-      }};
+      if (isDemoMode()) {
+        return { 
+          data: { 
+            // Return copies to ensure React state updates correctly
+            reports: [...demoReports],
+            schedules: [...demoSchedules]
+          } 
+        };
+      }
+      throw error;
+    }
+  },
+  getStatus: async () => {
+    return await api.get('/api/v1/reports/history');
+  },
+  getTaskStatus: async (id: number | string) => {
+    try {
+      return await api.get(`/api/v1/reports/status/${id}`);
+    } catch (error) {
+      if (isDemoMode()) {
+        const report = demoReports.find(r => r.id === id);
+        return { data: { status: report?.status || "Completed", ready: true } };
+      }
       throw error;
     }
   },
   getDetails: async (id: number | string) => {
-    try {
-      return await api.get(`/api/v1/reports/${id}`);
-    } catch (error) {
-      if (isDemoMode()) {
-        const report = seedData.reports.find(r => r.id === id);
-        return { data: report };
-      }
-      throw error;
-    }
+    return await api.get(`/api/v1/reports/status/${id}`);
   },
   generate: async () => {
     try {
-      return await api.post('/api/v1/reports/');
+      return await api.post('/api/v1/reports/global-audit');
     } catch (error) {
-      if (isDemoMode()) return { data: { message: "Demo report generation started", status: "Processing" } };
+      if (isDemoMode()) {
+        const newReport = {
+          id: `demo_${Date.now()}`,
+          name: "Global Intelligence Audit (Demo)",
+          status: "Processing",
+          date: new Date().toISOString().split('T')[0],
+          type: "Global",
+          format: "PDF",
+          size: "1.2 MB"
+        };
+        demoReports = [newReport, ...demoReports];
+        saveStorageItem('aigravity_demo_reports', demoReports);
+        
+        // Simulate completion after 4 seconds
+        setTimeout(() => {
+          const report = demoReports.find(r => r.id === newReport.id);
+          if (report) {
+            report.status = "Completed";
+            saveStorageItem('aigravity_demo_reports', demoReports);
+          }
+        }, 4000);
+
+        return { 
+          data: { 
+            id: newReport.id, 
+            message: "Demo audit initiated successfully",
+            status: "Processing"
+          } 
+        };
+      }
       throw error;
     }
   },
@@ -208,7 +257,7 @@ export const reportsService = {
     try {
       return await api.post(`/api/v1/reports/${id}/retry`);
     } catch (error) {
-      if (isDemoMode()) return { data: { message: "Demo report retry success" } };
+      if (isDemoMode()) return { data: { message: "Retry initiated (Demo)" } };
       throw error;
     }
   },
@@ -216,19 +265,62 @@ export const reportsService = {
     try {
       return await api.delete(`/api/v1/reports/${id}`);
     } catch (error) {
-      if (isDemoMode()) return { data: { message: "Demo report deletion success" } };
+      if (isDemoMode()) {
+        demoReports = demoReports.filter(r => r.id !== id);
+        saveStorageItem('aigravity_demo_reports', demoReports);
+        return { data: { message: "Report deleted (Demo)" } };
+      }
       throw error;
     }
   },
-  download: async (report: any) => {
-    if (isDemoMode() || report.url === '#') {
-      // For demo mode or if no real URL, we'll keep the client-side generation for now 
-      // but we wrap it in a service call style
-      return { demo: true };
+  download: async (reportId: number | string) => {
+    try {
+      return await api.get(`/api/v1/reports/download/${reportId}`, { responseType: 'blob' });
+    } catch (error) {
+      if (isDemoMode()) {
+        // Return a valid minimal PDF header/structure to avoid corruption errors in viewer
+        const pdfContent = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 51 >>\nstream\nBT /F1 12 Tf 72 720 Td (Demo Intelligence Report Generated) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000009 00000 n\n0000000062 00000 n\n0000000117 00000 n\n0000000244 00000 n\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n345\n%%EOF";
+        return { data: new Blob([pdfContent], { type: 'application/pdf' }) };
+      }
+      throw error;
     }
-    
-    // For real data, we fetch the blob
-    return api.get(report.url, { responseType: 'blob' });
+  },
+  emailExecutives: async (reportId: number | string) => {
+    try {
+      return await api.post(`/api/v1/reports/${reportId}/email-executives`);
+    } catch (error) {
+      if (isDemoMode()) return { data: { message: "SIMULATION: Intelligence audit delivered to CEO and HR successfully" } };
+      throw error;
+    }
+  },
+  createSchedule: async (data: any) => {
+    try {
+      return await api.post('/api/v1/reports/schedules', data);
+    } catch (error) {
+      if (isDemoMode()) {
+        const newSchedule = {
+          ...data,
+          id: `demo_sch_${Date.now()}`,
+          next_run: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        };
+        demoSchedules = [newSchedule, ...demoSchedules];
+        saveStorageItem('aigravity_demo_schedules', demoSchedules);
+        return { data: newSchedule };
+      }
+      throw error;
+    }
+  },
+  deleteSchedule: async (id: number | string) => {
+    try {
+      return await api.delete(`/api/v1/reports/schedules/${id}`);
+    } catch (error) {
+      if (isDemoMode()) {
+        demoSchedules = demoSchedules.filter(s => s.id !== id);
+        saveStorageItem('aigravity_demo_schedules', demoSchedules);
+        return { data: { message: "Demo schedule deletion success" } };
+      }
+      throw error;
+    }
   }
 };
 

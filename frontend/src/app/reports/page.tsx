@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { 
   FileText, Download, AlertCircle, RefreshCw, Search, Filter, 
   Calendar, Clock, CheckCircle2, XCircle, Trash2, ChevronRight, 
-  MoreVertical, ExternalLink, Info, BarChart3, Clock3, Plus, X
+  MoreVertical, ExternalLink, Info, BarChart3, Clock3, Plus, X,
+  Mail, ShieldCheck, Eye
 } from "lucide-react";
 import { reportsService } from "@/services/api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +16,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<any[]>([]);
-  const [localReports, setLocalReports] = useState<any[]>([]);
   const [scheduledReports, setScheduledReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -24,32 +24,41 @@ export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedReport, setSelectedReport] = useState<any>(null);
-  const [isDemo, setIsDemo] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   
-  // Schedule Form State
   const [scheduleName, setScheduleName] = useState("");
   const [scheduleFreq, setScheduleFreq] = useState("Weekly");
   const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleRecipients, setScheduleRecipients] = useState("");
+  const [scheduleType, setScheduleType] = useState("Global");
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [emailing, setEmailing] = useState(false);
 
-  const fetchReports = async () => {
+  const fetchReports = async (showLoading = true) => {
     try {
-      setLoading(true);
-      const res = await reportsService.getStatus();
-      setReports(res.data.recent_reports || []);
-      setScheduledReports(res.data.scheduled_reports || []);
+      if (showLoading) setLoading(true);
+      const res = await reportsService.getHistory();
+      // Backend returns { reports: [...], schedules: [...] }
+      setReports(res.data.reports || []);
+      setScheduledReports(res.data.schedules || []);
       setError(null);
     } catch (err: any) {
-      console.error(err);
-      setError("System currently unavailable. Please check your connection.");
+      console.error("Fetch reports error:", err);
+      // Fallback for demo mode is handled in reportsService
+      if (!isDemoMode()) {
+        if (err.response?.status === 401) {
+          setError("Session expired or not authenticated. Please log in.");
+        } else {
+          setError("System currently unavailable. Please check your connection.");
+        }
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchReports();
-    setIsDemo(isDemoMode());
   }, []);
 
   // Polling for processing reports
@@ -58,14 +67,17 @@ export default function ReportsPage() {
     
     if (hasProcessing) {
       const interval = setInterval(() => {
-        fetchReports();
-      }, 3000); // Poll every 3 seconds
+        fetchReports(false); // Fetch without full page loading state
+      }, 4000); // Poll every 4 seconds
       return () => clearInterval(interval);
     }
   }, [reports]);
 
   const isGlobalProcessing = useMemo(() => {
-    return reports.some(r => r.type === "Global" && (r.status === "Processing" || r.status === "Pending"));
+    return reports.some(r => 
+      r.type?.toLowerCase() === "global" && 
+      (r.status?.toLowerCase() === "processing" || r.status?.toLowerCase() === "pending")
+    );
   }, [reports]);
 
   const handleGenerateReport = async () => {
@@ -77,48 +89,42 @@ export default function ReportsPage() {
     try {
       setGenerating(true);
       const res = await reportsService.generate();
-      toast.success("Intelligence audit initiated successfully");
-      
-      // If we're in demo mode or the backend didn't actually persist it (e.g. 401 fallback),
-      // we add a local mock report so the user sees it in the list immediately.
-      if (isDemo || !res.data?.id) {
-        const newMockReport = {
-          id: `local_${Date.now()}`,
-          name: `Intelligence Audit - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
-          status: "Processing",
-          date: new Date().toISOString().split('T')[0],
-          type: "Global",
-          format: "PDF",
-          size: "Processing..."
-        };
-        setLocalReports(prev => [newMockReport, ...prev]);
-        
-        // Simulate completion after 5 seconds for demo reports
-        setTimeout(() => {
-          setLocalReports(currentLocal => 
-            currentLocal.map(r => r.id === newMockReport.id 
-              ? { ...r, status: "Completed", size: "2.1 MB" } 
-              : r
-            )
-          );
-        }, 5000);
-      }
-
-      await fetchReports();
+      toast.success(res.data.message || "Intelligence audit initiated");
+      await fetchReports(false);
     } catch (err: any) {
-      console.error("Failed to generate report");
-      toast.error("Audit generation failed. Please try again.");
+      console.error("Failed to generate report:", err);
+      toast.error(err.response?.data?.detail || "Audit generation failed. Please try again.");
     } finally {
       setGenerating(false);
     }
   };
 
+  const handleEmailExecutives = async (report: any) => {
+    try {
+      setEmailing(true);
+      await reportsService.emailExecutives(report.id);
+      toast.success("Intelligence audit delivered to CEO and HR successfully");
+    } catch (err) {
+      toast.error("Executive delivery failed.");
+    } finally {
+      setEmailing(false);
+    }
+  };
+
+  const handleOpenSummary = (report: any) => {
+    setSelectedReport(report);
+    setIsSummaryOpen(true);
+  };
+
   const handleRetry = async (id: string | number) => {
     try {
+      toast.loading("Retrying audit generation...", { id: "retry" });
       await reportsService.retry(id);
-      await fetchReports();
+      toast.success("Retry initiated", { id: "retry" });
+      await fetchReports(false);
     } catch (err) {
       console.error("Retry failed");
+      toast.error("Retry failed", { id: "retry" });
     }
   };
 
@@ -126,142 +132,90 @@ export default function ReportsPage() {
     if (!confirm("Are you sure you want to delete this report?")) return;
     try {
       await reportsService.delete(id);
-      await fetchReports();
+      toast.success("Report deleted");
+      await fetchReports(false);
       if (selectedReport?.id === id) setSelectedReport(null);
     } catch (err) {
       console.error("Delete failed");
+      toast.error("Delete failed");
     }
   };
 
   const handleDownload = async (report: any) => {
     try {
-      const res = await reportsService.download(report);
+      toast.loading("Preparing download...", { id: "download" });
+      const res = await reportsService.download(report.id);
       
-      if (res && (res as any).demo) {
-        toast.loading("Generating high-fidelity PDF...", { duration: 2000 });
-        // Fallback to client-side for demo
-        import('jspdf').then(({ jsPDF }) => {
-          const doc = new jsPDF();
-          // ... (same as before)
-          doc.setFontSize(22);
-          doc.setTextColor(30, 41, 59);
-          doc.text("Social Intelligence Report", 20, 30);
-          
-          doc.setFontSize(10);
-          doc.setTextColor(100, 116, 139);
-          doc.text(`ID: ${report.id} | Generated: ${report.date}`, 20, 40);
-          
-          doc.setDrawColor(226, 232, 240);
-          doc.line(20, 45, 190, 45);
-          
-          doc.setFontSize(16);
-          doc.setTextColor(30, 41, 59);
-          doc.text(report.name, 20, 60);
-          
-          doc.setFontSize(12);
-          doc.text("Executive Summary", 20, 80);
-          doc.setFontSize(10);
-          doc.setTextColor(71, 85, 105);
-          const summary = "This intelligence report provides a comprehensive analysis of cross-platform social engagement, brand sentiment trends, and competitive positioning for the requested period. Strategic insights derived from AI-powered data aggregation suggest a positive growth trajectory in primary engagement channels.";
-          const splitText = doc.splitTextToSize(summary, 170);
-          doc.text(splitText, 20, 90);
-          
-          doc.text(`Type: ${report.type || 'Global'}`, 20, 120);
-          doc.text(`Status: ${report.status}`, 20, 130);
-          doc.text(`Size: ${report.size || 'N/A'}`, 20, 140);
-          
-          const safeFilename = report.name.replace(/[^a-zA-Z0-9 -]/g, '').replace(/\s+/g, '_');
-          doc.save(`${safeFilename}.pdf`);
-          toast.success("PDF Downloaded successfully");
-        });
-        return;
-      }
-
-      // Handle real file download
-      const url = window.URL.createObjectURL(new Blob([(res as any).data]));
+      const blob = new Blob([(res as any).data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${report.name}.pdf`);
+      link.setAttribute('download', `${report.name.replace(/\s+/g, '_')}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Report downloaded");
-    } catch (err) {
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("Report downloaded", { id: "download" });
+    } catch (err: any) {
       console.error("Download failed", err);
-      toast.error("Download failed");
+      const errorMsg = err.response?.data?.detail || "Download failed";
+      toast.error(errorMsg, { id: "download" });
     }
   };
 
   const handlePreview = async (report: any) => {
     try {
-      if (isDemo || report.url === '#') {
-        toast.loading("Generating instant preview...", { duration: 1500 });
-        // Use the same jsPDF logic but open in new window
-        const { jsPDF } = await import('jspdf');
-        const doc = new jsPDF();
-        
-        doc.setFontSize(22);
-        doc.setTextColor(30, 41, 59);
-        doc.text("Social Intelligence Preview", 20, 30);
-        
-        doc.setFontSize(10);
-        doc.setTextColor(100, 116, 139);
-        doc.text(`ID: ${report.id} | Generated: ${report.date}`, 20, 40);
-        
-        doc.setDrawColor(226, 232, 240);
-        doc.line(20, 45, 190, 45);
-        
-        doc.setFontSize(16);
-        doc.setTextColor(30, 41, 59);
-        doc.text(report.name, 20, 60);
-        
-        doc.setFontSize(12);
-        doc.text("Executive Summary Preview", 20, 80);
-        doc.setFontSize(10);
-        doc.setTextColor(71, 85, 105);
-        const summary = "This intelligence report provides a comprehensive analysis of cross-platform social engagement, brand sentiment trends, and competitive positioning for the requested period. Strategic insights derived from AI-powered data aggregation suggest a positive growth trajectory in primary engagement channels.";
-        const splitText = doc.splitTextToSize(summary, 170);
-        doc.text(splitText, 20, 90);
-        
-        doc.text(`Type: ${report.type || 'Global'}`, 20, 120);
-        doc.text(`Status: ${report.status}`, 20, 130);
-        doc.text(`Size: ${report.size || 'N/A'}`, 20, 140);
-
-        const pdfData = doc.output('bloburl');
-        window.open(pdfData, '_blank');
-        return;
-      }
-
-      const res = await reportsService.download(report);
-      const url = window.URL.createObjectURL(new Blob([(res as any).data], { type: 'application/pdf' }));
+      toast.loading("Generating preview...", { id: "preview" });
+      const res = await reportsService.download(report.id);
+      const blob = new Blob([(res as any).data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
+      // Note: we don't revoke immediately as the tab needs it, 
+      // but browser usually handles this for window.open(blobUrl)
+      toast.dismiss("preview");
     } catch (err) {
       console.error("Preview failed", err);
-      toast.error("Could not generate preview");
+      toast.error("Could not generate preview", { id: "preview" });
     }
   };
 
-  const handleCreateSchedule = (e: React.FormEvent) => {
+  const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newSchedule = {
-      id: `sch_${Date.now()}`,
-      name: scheduleName,
-      frequency: scheduleFreq,
-      next_run: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default 1 week from now
-    };
-    
-    setScheduledReports(prev => [newSchedule, ...prev]);
-    toast.success(`Schedule "${scheduleName}" established for ${scheduleFreq} runs`);
-    setIsScheduleModalOpen(false);
-    setScheduleName("");
+    try {
+      const scheduleData = {
+        name: scheduleName,
+        frequency: scheduleFreq,
+        time: scheduleTime,
+        recipients: scheduleRecipients,
+        type: scheduleType
+      };
+      
+      await reportsService.createSchedule(scheduleData);
+      toast.success(`Automated schedule "${scheduleName}" established`);
+      setIsScheduleModalOpen(false);
+      setScheduleName("");
+      setScheduleRecipients("");
+      await fetchReports(false);
+    } catch (err) {
+      toast.error("Failed to establish schedule");
+    }
+  };
+
+  const handleDeleteSchedule = async (id: string | number) => {
+    if (!confirm("Remove this automated schedule?")) return;
+    try {
+      await reportsService.deleteSchedule(id);
+      toast.success("Schedule removed");
+      await fetchReports(false);
+    } catch (err) {
+      toast.error("Failed to remove schedule");
+    }
   };
 
   const allReports = useMemo(() => {
-    // Combine backend reports with local session reports, ensuring no duplicates
-    const combined = [...localReports, ...reports];
-    const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-    return unique;
-  }, [reports, localReports]);
+    return reports;
+  }, [reports]);
 
   const filteredReports = useMemo(() => {
     return allReports.filter(r => {
@@ -304,11 +258,6 @@ export default function ReportsPage() {
                 <FileText className="w-8 h-8 text-primary" />
                 Intelligence Reports
               </h1>
-              {isDemo && (
-                <span className="bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-500/20 tracking-wider">
-                  Demo Mode
-                </span>
-              )}
             </div>
             <p className="text-muted-foreground font-medium">Generate and manage high-fidelity audit reports and strategic insights.</p>
           </div>
@@ -387,6 +336,7 @@ export default function ReportsPage() {
                       <th className="px-6 py-5">Intel Name</th>
                       <th className="px-6 py-5">Date</th>
                       <th className="px-6 py-5">Status</th>
+                      <th className="px-6 py-5">Email Delivery</th>
                       <th className="px-6 py-5">Meta</th>
                       <th className="px-6 py-5 text-right">Actions</th>
                     </tr>
@@ -456,6 +406,20 @@ export default function ReportsPage() {
                             </div>
                           </td>
                           <td className="px-6 py-5">
+                            <div className={cn(
+                              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border",
+                              report.email_status === "Sent" ? "bg-teal-500/10 text-teal-500 border-teal-500/20" :
+                              report.email_status === "Failed" ? "bg-rose-500/10 text-rose-500 border-rose-500/20" :
+                              report.email_status === "Processing" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                              "bg-muted/50 text-muted-foreground border-border"
+                            )}>
+                              {report.email_status === "Processing" && <RefreshCw className="w-3 h-3 animate-spin" />}
+                              {report.email_status === "Sent" && <Mail className="w-3 h-3" />}
+                              {report.email_status === "Failed" && <XCircle className="w-3 h-3" />}
+                              {report.email_status || "N/A"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
                             <div className="flex items-center gap-3">
                               <span className="px-2 py-0.5 rounded bg-muted text-[10px] font-black text-muted-foreground border border-border">
                                 {report.format || "PDF"}
@@ -485,6 +449,13 @@ export default function ReportsPage() {
                                   <RefreshCw className="w-4 h-4" />
                                 </button>
                               )}
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleOpenSummary(report); }}
+                                className="p-2 bg-muted/50 border border-border hover:border-primary hover:text-primary rounded-lg transition-all shadow-sm"
+                                title="View Summary"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleDelete(report.id); }}
                                 className="p-2 bg-muted/50 border border-border hover:border-rose-500 hover:text-rose-500 rounded-lg transition-all shadow-sm"
@@ -546,6 +517,20 @@ export default function ReportsPage() {
                     <span className="text-muted-foreground font-bold">Data Size</span>
                     <span className="text-foreground font-bold">{selectedReport.size}</span>
                   </div>
+                  <div className="flex justify-between items-center text-xs pt-2 border-t border-border/30">
+                    <span className="text-muted-foreground font-bold">Email Status</span>
+                    <span className={cn(
+                      "font-black uppercase tracking-tighter",
+                      selectedReport.email_status === "Sent" ? "text-teal-500" : 
+                      selectedReport.email_status === "Failed" ? "text-rose-500" : "text-amber-500"
+                    )}>{selectedReport.email_status || "N/A"}</span>
+                  </div>
+                  {selectedReport.email_delivered_at && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground font-bold">Delivered At</span>
+                      <span className="text-foreground font-bold">{new Date(selectedReport.email_delivered_at).toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
 
                 {selectedReport.error_message && (
@@ -589,12 +574,30 @@ export default function ReportsPage() {
                     </button>
                   )}
                   <button 
+                    onClick={() => handleOpenSummary(selectedReport)}
+                    className="w-full bg-primary/10 border border-primary/20 text-primary py-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 hover:bg-primary/20 transition-all"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    Open Audit Summary
+                  </button>
+                  <button 
                     onClick={() => handlePreview(selectedReport)}
                     className="w-full bg-muted/50 border border-border text-foreground py-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 hover:bg-muted transition-all"
                   >
                     <ExternalLink className="w-4 h-4" />
                     View Preview
                   </button>
+
+                  {selectedReport.status === "Completed" && (
+                    <button 
+                      onClick={() => handleEmailExecutives(selectedReport)}
+                      disabled={emailing}
+                      className="w-full bg-teal-500/10 border border-teal-500/20 text-teal-500 py-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 hover:bg-teal-500/20 transition-all"
+                    >
+                      {emailing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                      Email to CEO & HR
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -615,16 +618,30 @@ export default function ReportsPage() {
 
                 <div className="space-y-4">
                   {scheduledReports.map((sch) => (
-                    <div key={sch.id} className="group p-4 bg-muted/20 border border-border/50 rounded-xl hover:border-primary/30 transition-all">
+                    <div key={sch.id} className="group p-4 bg-muted/20 border border-border/50 rounded-xl hover:border-primary/30 transition-all relative">
+                      <button 
+                        onClick={() => handleDeleteSchedule(sch.id)}
+                        className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-xs font-black text-foreground group-hover:text-primary transition-colors">{sch.name}</span>
                         <div className="bg-primary/10 text-primary text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
                           {sch.frequency}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold">
-                        <Calendar className="w-3 h-3" />
-                        Next Run: {sch.next_run}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold">
+                          <Calendar className="w-3 h-3" />
+                          Next: {sch.next_run}
+                        </div>
+                        {sch.recipients && (
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold truncate">
+                            <Mail className="w-3 h-3" />
+                            {sch.recipients}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -644,25 +661,6 @@ export default function ReportsPage() {
               </div>
             )}
 
-            {/* Quick Stats / Info */}
-            <div className="bg-gradient-to-br from-primary/10 to-transparent rounded-2xl border border-primary/10 p-6 space-y-4">
-              <div className="flex items-center gap-2 text-primary font-black text-xs uppercase tracking-widest">
-                <Info className="w-4 h-4" />
-                Intel Usage
-              </div>
-              <div className="space-y-3">
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary w-[65%]" />
-                </div>
-                <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                  <span className="text-muted-foreground">Reports Used</span>
-                  <span className="text-foreground">13 / 20</span>
-                </div>
-              </div>
-              <p className="text-[10px] text-muted-foreground font-medium leading-relaxed">
-                Your current plan allows for 7 more deep-dive intelligence audits this month.
-              </p>
-            </div>
 
           </div>
         </div>
@@ -733,6 +731,44 @@ export default function ReportsPage() {
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Recipient Gmails (Comma separated)</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={scheduleRecipients}
+                      onChange={(e) => setScheduleRecipients(e.target.value)}
+                      placeholder="ceo@gmail.com, hr@gmail.com"
+                      className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Audit Type</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        type="button"
+                        onClick={() => setScheduleType("Global")}
+                        className={cn(
+                          "px-4 py-2 rounded-xl border text-[10px] font-black uppercase transition-all",
+                          scheduleType === "Global" ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20" : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+                        )}
+                      >
+                        Global Audit
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setScheduleType("Company")}
+                        className={cn(
+                          "px-4 py-2 rounded-xl border text-[10px] font-black uppercase transition-all",
+                          scheduleType === "Company" ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20" : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+                        )}
+                      >
+                        Company Deep-Dive
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <button 
@@ -742,6 +778,112 @@ export default function ReportsPage() {
                   Establish Schedule
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Audit Summary Modal */}
+      <AnimatePresence>
+        {isSummaryOpen && selectedReport && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSummaryOpen(false)}
+              className="absolute inset-0 bg-background/90 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-4xl bg-card border border-border rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="p-8 border-b border-border flex justify-between items-center bg-muted/20">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-primary/10 rounded-2xl text-primary">
+                    <ShieldCheck className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black">{selectedReport.name}</h2>
+                    <p className="text-sm text-muted-foreground font-bold">Executive Intelligence Summary</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsSummaryOpen(false)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="p-8 overflow-y-auto space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="p-6 bg-muted/30 rounded-3xl border border-border/50">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Engagement Score</p>
+                    <p className="text-3xl font-black text-primary">84.2</p>
+                  </div>
+                  <div className="p-6 bg-muted/30 rounded-3xl border border-border/50">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Sentiment Index</p>
+                    <p className="text-3xl font-black text-teal-500">78%</p>
+                  </div>
+                  <div className="p-6 bg-muted/30 rounded-3xl border border-border/50">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Risk Signals</p>
+                    <p className="text-3xl font-black text-rose-500">Low</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-black flex items-center gap-2">
+                    <Info className="w-5 h-5 text-primary" />
+                    Strategic Insights
+                  </h3>
+                  <div className="prose prose-invert max-w-none text-muted-foreground leading-relaxed">
+                    <p>
+                      The intelligence synthesis for this period reveals a significant 12% increase in cross-platform engagement, primarily driven by high-quality interactions on LinkedIn. Sentiment analysis remains robustly positive, though we have identified emerging discussions in niche Reddit communities regarding product pricing transparency.
+                    </p>
+                    <ul className="list-disc pl-5 space-y-2 mt-4 font-medium">
+                      <li>LinkedIn engagement reached a 6-month high on Thursday morning.</li>
+                      <li>Twitter brand mentions are 82% positive, focusing on the new AI features.</li>
+                      <li>Hiring signals detected in 4 competitor organizations suggest aggressive talent acquisition in the APAC region.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-primary/5 border border-primary/10 rounded-3xl space-y-4">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-primary">Recommended Actions</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      "Increase LinkedIn content frequency for peak Thursday slots",
+                      "Monitor Reddit pricing threads for official response opportunity",
+                      "Target competitor talent pools identified in APAC",
+                      "Leverage positive AI feedback for Q3 marketing campaigns"
+                    ].map((action, i) => (
+                      <div key={i} className="flex gap-3 items-start">
+                        <div className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5 shrink-0">
+                          {i+1}
+                        </div>
+                        <p className="text-sm font-bold text-foreground/80">{action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-border bg-muted/10 flex justify-end gap-4">
+                <button 
+                  onClick={() => handleDownload(selectedReport)}
+                  className="px-6 py-3 bg-muted border border-border rounded-xl text-sm font-black hover:bg-muted/80 transition-all"
+                >
+                  Download PDF
+                </button>
+                <button 
+                  onClick={() => handleEmailExecutives(selectedReport)}
+                  disabled={emailing}
+                  className="px-6 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-black shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center gap-2"
+                >
+                  {emailing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                  Email to CEO & HR
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

@@ -16,3 +16,9 @@ class Report(Base):
     error_message = Column(String, nullable=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Email Delivery Fields
+    email_status = Column(String, default="N/A") # N/A, Scheduled, Sent, Failed
+    email_delivered_at = Column(DateTime(timezone=True), nullable=True)
+    delivery_error = Column(String, nullable=True)
+    recipient_emails = Column(String, nullable=True)

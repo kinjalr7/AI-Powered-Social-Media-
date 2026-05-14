@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import auth, companies, social, ingest, analytics, reports, webhooks, copilot, dashboard_api, charts, ws, settings
+from app.routers import auth, companies, social, ingest, analytics, reports, webhooks, copilot, dashboard_api, charts, ws, settings, automation
 
 api_router = APIRouter()
 
@@ -15,3 +15,4 @@ api_router.include_router(dashboard_api.router)
 api_router.include_router(charts.router, prefix="/charts", tags=["charts"])
 api_router.include_router(ws.router, tags=["websocket"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+api_router.include_router(automation.router, tags=["automation"])
