@@ -332,6 +332,7 @@ async def delete_report(
 @router.post("/{report_id}/email-executives")
 async def email_report_to_executives(
     report_id: int,
+    payload: dict = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -345,8 +346,12 @@ async def email_report_to_executives(
     if report.status != "Completed":
         raise HTTPException(status_code=400, detail="Only completed reports can be emailed")
     
+    recipient_email = payload.get("recipient_email") if payload else None
+    if not recipient_email:
+        recipient_email = current_user.email
+        
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        return {"message": "Email delivery simulated (SMTP credentials not set in .env)", "simulated": True}
+        return {"message": "Email delivery simulated (SMTP credentials not set in .env)", "simulated": True, "recipient": recipient_email}
 
     temp_dir = tempfile.gettempdir()
     report_path = os.path.join(temp_dir, report.url)
@@ -357,7 +362,7 @@ async def email_report_to_executives(
     await db.commit()
 
     success = send_report_email(
-        recipient_emails=current_user.email, 
+        recipient_emails=recipient_email, 
         report_path=report_path,
         report_name=report.name
     )
@@ -365,9 +370,9 @@ async def email_report_to_executives(
     if success:
         report.email_status = "Sent"
         report.email_delivered_at = datetime.now()
-        report.recipient_emails = current_user.email
+        report.recipient_emails = recipient_email
         await db.commit()
-        return {"message": f"Report successfully delivered to {current_user.email}"}
+        return {"message": f"Report successfully delivered to {recipient_email}"}
     else:
         report.email_status = "Failed"
         report.delivery_error = "SMTP delivery failed (check logs/credentials)"

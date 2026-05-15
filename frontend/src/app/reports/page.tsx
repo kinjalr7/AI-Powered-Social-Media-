@@ -33,6 +33,8 @@ export default function ReportsPage() {
   const [scheduleType, setScheduleType] = useState("Global");
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [emailing, setEmailing] = useState(false);
+  const [isEmailPromptOpen, setIsEmailPromptOpen] = useState(false);
+  const [promptEmail, setPromptEmail] = useState("");
 
   const fetchReports = async (showLoading = true) => {
     try {
@@ -99,11 +101,21 @@ export default function ReportsPage() {
     }
   };
 
-  const handleEmailExecutives = async (report: any) => {
+  const handleEmailExecutives = async (report: any, customEmail?: string) => {
+    // If no email provided and status is N/A, prompt for email
+    if (!customEmail && (report.email_status === "N/A" || !report.email_status)) {
+      setSelectedReport(report);
+      setIsEmailPromptOpen(true);
+      return;
+    }
+
     try {
       setEmailing(true);
-      await reportsService.emailExecutives(report.id);
-      toast.success("Intelligence audit delivered to CEO and HR successfully");
+      const res = await reportsService.emailExecutives(report.id, customEmail);
+      toast.success(res.data.message || "Intelligence audit delivered successfully");
+      setIsEmailPromptOpen(false);
+      setPromptEmail("");
+      await fetchReports(false); // Refresh to see updated email status
     } catch (err) {
       toast.error("Executive delivery failed.");
     } finally {
@@ -882,6 +894,70 @@ export default function ReportsPage() {
                 >
                   {emailing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                   Email to CEO & HR
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Email Prompt Modal */}
+      <AnimatePresence>
+        {isEmailPromptOpen && selectedReport && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEmailPromptOpen(false)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-black flex items-center gap-2">
+                    <Mail className="w-5 h-5 text-primary" />
+                    Executive Delivery
+                  </h2>
+                  <button type="button" onClick={() => setIsEmailPromptOpen(false)}>
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl space-y-2">
+                    <p className="text-xs font-bold text-primary/80 uppercase tracking-wider">Report Target</p>
+                    <p className="text-sm font-black">{selectedReport.name}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Recipient Email (CEO/HR)</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input 
+                        required
+                        type="email" 
+                        value={promptEmail}
+                        onChange={(e) => setPromptEmail(e.target.value)}
+                        placeholder="e.g. executive@company.com"
+                        className="w-full bg-muted/50 border border-border rounded-xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all font-medium"
+                      />
+                    </div>
+                    <p className="text-[9px] text-muted-foreground italic ml-1">* This report will be delivered as an encrypted PDF attachment.</p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => handleEmailExecutives(selectedReport, promptEmail)}
+                  disabled={emailing || !promptEmail}
+                  className="w-full bg-primary text-primary-foreground py-4 rounded-2xl text-sm font-black shadow-lg shadow-primary/20 hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {emailing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  {emailing ? "Delivering..." : "Confirm & Send Audit"}
                 </button>
               </div>
             </motion.div>

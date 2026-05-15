@@ -285,11 +285,13 @@ export const reportsService = {
       throw error;
     }
   },
-  emailExecutives: async (reportId: number | string) => {
+  emailExecutives: async (reportId: number | string, recipientEmail?: string) => {
     try {
-      return await api.post(`/api/v1/reports/${reportId}/email-executives`);
+      return await api.post(`/api/v1/reports/${reportId}/email-executives`, {
+        recipient_email: recipientEmail
+      });
     } catch (error) {
-      if (isDemoMode()) return { data: { message: "SIMULATION: Intelligence audit delivered to CEO and HR successfully" } };
+      if (isDemoMode()) return { data: { message: `SIMULATION: Intelligence audit delivered to ${recipientEmail || 'CEO and HR'} successfully` } };
       throw error;
     }
   },
